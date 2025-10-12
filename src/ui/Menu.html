@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calendar Utilities - Menu</title>
+    <?!= include('ui/Styles'); ?>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Calendar Utilities</h1>
+
+      <!-- Calendar Selection -->
+      <div class="card mb-3">
+        <label for="calendarSelect">Select Calendar:</label>
+        <select id="calendarSelect" onchange="handleCalendarChange()">
+          <option value="">-- Select a calendar --</option>
+        </select>
+        <p class="text-muted mb-0" style="font-size: 0.875rem;">
+          Select which calendar to use with the utilities below
+        </p>
+      </div>
+
+      <!-- Utility Menu -->
+      <nav class="menu">
+        <button onclick="navigateToUtility('BulkOps')" id="bulkOpsBtn" disabled>
+          <strong>Bulk Operations</strong>
+          <div style="font-size: 0.875rem; font-weight: 400; margin-top: 0.25rem;">
+            Perform bulk actions on events: delete, change color, or move calendar
+          </div>
+        </button>
+
+        <button onclick="navigateToUtility('Analytics')" id="analyticsBtn" disabled>
+          <strong>Analytics & Insights</strong>
+          <div style="font-size: 0.875rem; font-weight: 400; margin-top: 0.25rem;">
+            View time allocation and scheduling patterns in your calendar
+          </div>
+        </button>
+
+        <button onclick="navigateToUtility('Cleanup')" id="cleanupBtn" disabled>
+          <strong>Calendar Cleanup</strong>
+          <div style="font-size: 0.875rem; font-weight: 400; margin-top: 0.25rem;">
+            Find and remove duplicate events to keep your calendar organized
+          </div>
+        </button>
+
+        <button onclick="navigateToUtility('Availability')" id="availabilityBtn" disabled>
+          <strong>Find Availability</strong>
+          <div style="font-size: 0.875rem; font-weight: 400; margin-top: 0.25rem;">
+            Find available time slots in your calendar for scheduling meetings
+          </div>
+        </button>
+      </nav>
+
+      <!-- Loading indicator -->
+      <div id="loadingIndicator" class="loading hidden">
+        <div class="spinner"></div>
+        <p>Loading...</p>
+      </div>
+
+      <!-- Error message area -->
+      <div id="errorMessage" class="message error hidden"></div>
+    </div>
+
+    <script>
+      // State
+      let selectedCalendarId = null;
+      let availableCalendars = [];
+
+      /**
+       * Populate calendar dropdown with available calendars
+       */
+      function populateCalendarDropdown(calendars) {
+        const select = document.getElementById('calendarSelect');
+        if (!select) {
+          console.error('Calendar select element not found!');
+          return;
+        }
+
+        select.innerHTML = '';
+
+        if (calendars.length === 0) {
+          select.innerHTML = '<option value="">No calendars available</option>';
+          return;
+        }
+
+        // Add placeholder option
+        const placeholder = document.createElement('option');
+        placeholder.value = '';
+        placeholder.textContent = '-- Select a calendar --';
+        select.appendChild(placeholder);
+
+        // Add calendar options
+        calendars.forEach(function(calendar) {
+          const option = document.createElement('option');
+          option.value = calendar.id;
+          option.textContent = calendar.name + (calendar.isPrimary ? ' (Primary)' : '');
+          select.appendChild(option);
+        });
+      }
+
+      /**
+       * Initialize the menu on page load
+       */
+      function initializeMenu() {
+        // Try to restore from sessionStorage first
+        const cachedCalendarId = sessionStorage.getItem('selectedCalendarId');
+        const cachedCalendars = sessionStorage.getItem('availableCalendars');
+
+        if (cachedCalendarId && cachedCalendars) {
+          // Restore from cache
+          selectedCalendarId = cachedCalendarId;
+          try {
+            availableCalendars = JSON.parse(cachedCalendars);
+
+            // Populate dropdown immediately
+            populateCalendarDropdown(availableCalendars);
+
+            // Set selected value
+            const select = document.getElementById('calendarSelect');
+            if (select) {
+              select.value = selectedCalendarId;
+              enableUtilityButtons();
+            }
+          } catch (e) {
+            console.error('Error restoring from cache:', e);
+            // Fall back to server load
+            loadCalendars();
+            loadCurrentConfig();
+          }
+        } else {
+          // Fresh load - fetch from server
+          loadCalendars();
+          loadCurrentConfig();
+        }
+      }
+
+      /**
+       * Load available calendars from server
+       */
+      function loadCalendars() {
+        showLoading(true);
+
+        google.script.run
+          .withSuccessHandler(function(calendars) {
+            availableCalendars = calendars;
+            // Cache calendars in sessionStorage
+            sessionStorage.setItem('availableCalendars', JSON.stringify(calendars));
+            populateCalendarDropdown(calendars);
+            showLoading(false);
+          })
+          .withFailureHandler(function(error) {
+            showError('Failed to load calendars: ' + error.message);
+            showLoading(false);
+          })
+          .getAvailableCalendars();
+      }
+
+      /**
+       * Load current configuration to get selected calendar
+       */
+      function loadCurrentConfig() {
+        google.script.run
+          .withSuccessHandler(function(config) {
+            if (config.selectedCalendarId) {
+              selectedCalendarId = config.selectedCalendarId;
+              // Cache selected calendar
+              sessionStorage.setItem('selectedCalendarId', selectedCalendarId);
+              // Set dropdown value once calendars are loaded
+              setTimeout(function() {
+                const select = document.getElementById('calendarSelect');
+                if (select) {
+                  select.value = selectedCalendarId;
+                  enableUtilityButtons();
+                }
+              }, 500);
+            }
+          })
+          .withFailureHandler(function(error) {
+            console.error('Failed to load config:', error);
+          })
+          .getUserConfig();
+      }
+
+      /**
+       * Handle calendar selection change
+       */
+      function handleCalendarChange() {
+        const select = document.getElementById('calendarSelect');
+        const calendarId = select.value;
+
+        if (!calendarId) {
+          selectedCalendarId = null;
+          sessionStorage.removeItem('selectedCalendarId');
+          disableUtilityButtons();
+          return;
+        }
+
+        showLoading(true);
+
+        google.script.run
+          .withSuccessHandler(function(result) {
+            if (result.success) {
+              selectedCalendarId = calendarId;
+              // Cache selected calendar in sessionStorage
+              sessionStorage.setItem('selectedCalendarId', calendarId);
+              enableUtilityButtons();
+              showMessage('Calendar selected successfully', 'success');
+            } else {
+              showError('Failed to select calendar: ' + result.error);
+              select.value = selectedCalendarId || '';
+            }
+            showLoading(false);
+          })
+          .withFailureHandler(function(error) {
+            showError('Failed to select calendar: ' + error.message);
+            select.value = selectedCalendarId || '';
+            showLoading(false);
+          })
+          .selectCalendar(calendarId);
+      }
+
+      /**
+       * Navigate to a utility page
+       */
+      function navigateToUtility(utilityName) {
+        if (!selectedCalendarId) {
+          showError('Please select a calendar first');
+          return;
+        }
+
+        showLoading(true);
+
+        google.script.run
+          .withSuccessHandler(function(html) {
+            // Replace entire document to ensure scripts execute
+            document.open();
+            document.write(html);
+            document.close();
+          })
+          .withFailureHandler(function(error) {
+            showError('Failed to load utility: ' + error.message);
+            showLoading(false);
+          })
+          .loadUtility(utilityName);
+      }
+
+      /**
+       * Enable utility buttons
+       */
+      function enableUtilityButtons() {
+        document.getElementById('bulkOpsBtn').disabled = false;
+        document.getElementById('analyticsBtn').disabled = false;
+        document.getElementById('cleanupBtn').disabled = false;
+        document.getElementById('availabilityBtn').disabled = false;
+      }
+
+      /**
+       * Disable utility buttons
+       */
+      function disableUtilityButtons() {
+        document.getElementById('bulkOpsBtn').disabled = true;
+        document.getElementById('analyticsBtn').disabled = true;
+        document.getElementById('cleanupBtn').disabled = true;
+        document.getElementById('availabilityBtn').disabled = true;
+      }
+
+      /**
+       * Show/hide loading indicator
+       */
+      function showLoading(show) {
+        const indicator = document.getElementById('loadingIndicator');
+        if (show) {
+          indicator.classList.remove('hidden');
+        } else {
+          indicator.classList.add('hidden');
+        }
+      }
+
+      /**
+       * Show error message
+       */
+      function showError(message) {
+        const errorDiv = document.getElementById('errorMessage');
+        errorDiv.textContent = message;
+        errorDiv.classList.remove('hidden');
+
+        // Auto-hide after 5 seconds
+        setTimeout(function() {
+          errorDiv.classList.add('hidden');
+        }, 5000);
+      }
+
+      /**
+       * Show success/info message
+       */
+      function showMessage(message, type) {
+        const errorDiv = document.getElementById('errorMessage');
+        errorDiv.textContent = message;
+        errorDiv.className = 'message ' + (type || 'info');
+        errorDiv.classList.remove('hidden');
+
+        // Auto-hide after 3 seconds
+        setTimeout(function() {
+          errorDiv.classList.add('hidden');
+        }, 3000);
+      }
+
+      // Initialize when DOM is fully loaded
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initializeMenu);
+      } else {
+        // DOM already ready, init immediately
+        initializeMenu();
+      }
+    </script>
+  </body>
+</html>

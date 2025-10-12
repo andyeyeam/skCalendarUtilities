@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Find Availability</title>
+    <?!= include('ui/Styles'); ?>
+  </head>
+  <body>
+    <div class="container">
+      <!-- Back button -->
+      <button class="back-button" onclick="navigateToMenu()">
+        ← Back to Menu
+      </button>
+
+      <h1>Find Availability</h1>
+
+      <!-- Calendar info -->
+      <div id="calendarInfo" class="card mb-3">
+        <p class="text-muted mb-0" style="font-size: 0.875rem;">
+          Searching calendar: <span id="calendarName">Loading...</span>
+        </p>
+      </div>
+
+      <!-- Search form -->
+      <div class="card mb-3">
+        <form id="searchForm" onsubmit="handleFindAvailability(event); return false;">
+          <div class="form-group">
+            <label for="startDateTime">From Date+Time: <span id="startDayOfWeek" style="color: #666; font-weight: normal;"></span></label>
+            <input type="datetime-local" id="startDateTime" required>
+          </div>
+
+          <div class="form-group">
+            <label for="endDateTime">To Date+Time: <span id="endDayOfWeek" style="color: #666; font-weight: normal;"></span></label>
+            <input type="datetime-local" id="endDateTime" required>
+          </div>
+
+          <div class="form-group">
+            <label for="minDuration">Minimum Duration (minutes):</label>
+            <input type="number" id="minDuration" min="15" max="120" value="30" required>
+            <p class="text-muted mb-0" style="font-size: 0.75rem; margin-top: 0.25rem;">
+              Enter duration between 15 and 120 minutes
+            </p>
+          </div>
+
+          <button type="submit" class="button">Find Availability</button>
+        </form>
+      </div>
+
+      <!-- Loading indicator -->
+      <div id="loadingIndicator" class="loading hidden">
+        <div class="spinner"></div>
+        <p>Searching calendar...</p>
+      </div>
+
+      <!-- Results section -->
+      <div id="resultsSection" class="hidden">
+        <div id="resultsMetadata" class="card mb-3"></div>
+        <div id="resultsSlots"></div>
+      </div>
+
+      <!-- Empty state -->
+      <div id="emptyState" class="card hidden">
+        <div class="empty-state">
+          <h3>No Availability Found</h3>
+          <p>There are no available time slots matching your search criteria.</p>
+          <p class="text-muted">Try expanding your date range or check if all time slots are booked.</p>
+        </div>
+      </div>
+
+      <!-- Error message -->
+      <div id="errorMessage" class="message error hidden"></div>
+    </div>
+
+    <script>
+      // State
+      let selectedCalendar = null;
+
+      // Initialize on load
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initializeAvailabilityScreen);
+      } else {
+        initializeAvailabilityScreen();
+      }
+
+      function initializeAvailabilityScreen() {
+        // Load selected calendar
+        google.script.run
+          .withSuccessHandler(function(response) {
+            if (response.success) {
+              selectedCalendar = response.calendar;
+              document.getElementById('calendarName').textContent = response.calendar.name;
+            } else {
+              showError('No calendar selected. Please return to menu and select a calendar.');
+            }
+          })
+          .withFailureHandler(function(error) {
+            showError('Failed to load calendar: ' + error.message);
+          })
+          .getSelectedCalendar();
+
+        // Set default dates (next business day at 09:00 to 4 business days later at 17:30)
+        var nextBusinessDay = getNextBusinessDay(new Date());
+        nextBusinessDay.setHours(9, 0, 0, 0);
+
+        var fourBusinessDaysLater = addBusinessDays(nextBusinessDay, 4);
+        fourBusinessDaysLater.setHours(17, 30, 0, 0);
+
+        document.getElementById('startDateTime').value = formatDateTimeLocal(nextBusinessDay);
+        document.getElementById('endDateTime').value = formatDateTimeLocal(fourBusinessDaysLater);
+
+        // Add event listeners to update day of week
+        document.getElementById('startDateTime').addEventListener('change', updateStartDayOfWeek);
+        document.getElementById('endDateTime').addEventListener('change', updateEndDayOfWeek);
+
+        // Initial update of day of week
+        updateStartDayOfWeek();
+        updateEndDayOfWeek();
+      }
+
+      function formatDateTimeLocal(date) {
+        var year = date.getFullYear();
+        var month = String(date.getMonth() + 1).padStart(2, '0');
+        var day = String(date.getDate()).padStart(2, '0');
+        var hours = String(date.getHours()).padStart(2, '0');
+        var minutes = String(date.getMinutes()).padStart(2, '0');
+        return year + '-' + month + '-' + day + 'T' + hours + ':' + minutes;
+      }
+
+      function getNextBusinessDay(date) {
+        var result = new Date(date);
+        result.setDate(result.getDate() + 1); // Start from tomorrow
+
+        // If it's Saturday (6), add 2 days to get to Monday
+        // If it's Sunday (0), add 1 day to get to Monday
+        var dayOfWeek = result.getDay();
+        if (dayOfWeek === 0) { // Sunday
+          result.setDate(result.getDate() + 1);
+        } else if (dayOfWeek === 6) { // Saturday
+          result.setDate(result.getDate() + 2);
+        }
+
+        return result;
+      }
+
+      function addBusinessDays(startDate, numberOfDays) {
+        var result = new Date(startDate);
+        var addedDays = 0;
+
+        while (addedDays < numberOfDays) {
+          result.setDate(result.getDate() + 1);
+          var dayOfWeek = result.getDay();
+
+          // Only count weekdays (Monday-Friday)
+          if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+            addedDays++;
+          }
+        }
+
+        return result;
+      }
+
+      function updateStartDayOfWeek() {
+        var input = document.getElementById('startDateTime');
+        var span = document.getElementById('startDayOfWeek');
+        if (input.value) {
+          var date = new Date(input.value);
+          var dayName = date.toLocaleDateString('en-US', { weekday: 'long' });
+          span.textContent = '[' + dayName + ']';
+        } else {
+          span.textContent = '';
+        }
+      }
+
+      function updateEndDayOfWeek() {
+        var input = document.getElementById('endDateTime');
+        var span = document.getElementById('endDayOfWeek');
+        if (input.value) {
+          var date = new Date(input.value);
+          var dayName = date.toLocaleDateString('en-US', { weekday: 'long' });
+          span.textContent = '[' + dayName + ']';
+        } else {
+          span.textContent = '';
+        }
+      }
+
+      function handleFindAvailability(event) {
+        event.preventDefault();
+
+        var startDateTime = document.getElementById('startDateTime').value;
+        var endDateTime = document.getElementById('endDateTime').value;
+        var minDuration = parseInt(document.getElementById('minDuration').value);
+
+        // Client-side validation
+        if (!startDateTime || !endDateTime) {
+          showError('Please select both start and end date/time');
+          return;
+        }
+
+        if (!minDuration || isNaN(minDuration)) {
+          showError('Please enter a valid duration');
+          return;
+        }
+
+        if (minDuration < 15 || minDuration > 120) {
+          showError('Duration must be between 15 and 120 minutes');
+          return;
+        }
+
+        var startDateTimeObj = new Date(startDateTime);
+        var endDateTimeObj = new Date(endDateTime);
+
+        if (startDateTimeObj >= endDateTimeObj) {
+          showError('From date/time must be before To date/time');
+          return;
+        }
+
+        // Calculate time difference
+        var timeDiffMs = endDateTimeObj - startDateTimeObj;
+        var daysDiff = timeDiffMs / (1000 * 60 * 60 * 24);
+
+        if (daysDiff > 14) {
+          showError('Date range must be 14 days or less');
+          return;
+        }
+
+        // Hide previous results/errors
+        hideAll();
+        showLoading(true);
+
+        // Call server with date-time range and minimum duration
+        google.script.run
+          .withSuccessHandler(function(response) {
+            console.log('Server response:', response);
+            showLoading(false);
+            if (response.success) {
+              console.log('Displaying results for', response.slots.length, 'slots');
+              displayResults(response, minDuration);
+            } else {
+              console.error('Server returned error:', response.error);
+              showError(response.error);
+            }
+          })
+          .withFailureHandler(function(error) {
+            console.error('Server call failed:', error);
+            showLoading(false);
+            showError('Server error: ' + error.message);
+          })
+          .findAvailability(startDateTime, endDateTime, minDuration);
+      }
+
+      function displayResults(response, minDuration) {
+        console.log('displayResults called with', response.slots.length, 'slots');
+
+        if (response.slots.length === 0) {
+          console.log('No slots found, showing empty state');
+          showEmptyState();
+          return;
+        }
+
+        // Show metadata
+        var metadata = response.metadata;
+        console.log('Metadata:', metadata);
+        var durationText = minDuration && minDuration > 15 ? '<br>Minimum duration: ' + minDuration + ' minutes' : '';
+        var metadataHtml = '<p><strong>Search Results</strong></p>' +
+          '<p class="text-muted" style="font-size: 0.875rem;">' +
+          'Date range: ' + formatDate(new Date(metadata.dateRange.start)) + ' - ' + formatDate(new Date(metadata.dateRange.end)) + '<br>' +
+          'Working days: ' + metadata.workingDaysCount + '<br>' +
+          'Available slots: ' + metadata.totalSlotsFound +
+          durationText +
+          '</p>';
+        document.getElementById('resultsMetadata').innerHTML = metadataHtml;
+        console.log('Metadata HTML updated');
+
+        // Group slots by date
+        var slotsByDate = groupSlotsByDate(response.slots);
+        console.log('Grouped slots:', slotsByDate);
+
+        // Render slots
+        var slotsHtml = '';
+        for (var dateStr in slotsByDate) {
+          var dateSlots = slotsByDate[dateStr];
+          console.log('Rendering date:', dateStr, 'with', dateSlots.length, 'slots');
+          slotsHtml += '<div class="card mb-2">';
+          slotsHtml += '<h3 style="font-size: 1.125rem; margin-bottom: 0.5rem;">' + formatDate(new Date(dateStr)) + '</h3>';
+          slotsHtml += '<div>';
+
+          dateSlots.forEach(function(slot) {
+            slotsHtml += '<div style="padding: 0.5rem 0; border-bottom: 1px solid #f0f0f0;">';
+            slotsHtml += '<span style="font-weight: 600;">' + slot.formattedStart + ' - ' + slot.formattedEnd + '</span>';
+            slotsHtml += '<span style="color: #666; margin-left: 1rem;">(' + slot.formattedDuration + ')</span>';
+            slotsHtml += '</div>';
+          });
+
+          slotsHtml += '</div>';
+          slotsHtml += '</div>';
+        }
+
+        console.log('Slots HTML length:', slotsHtml.length);
+        document.getElementById('resultsSlots').innerHTML = slotsHtml;
+        document.getElementById('resultsSection').classList.remove('hidden');
+        console.log('Results section shown');
+      }
+
+      function groupSlotsByDate(slots) {
+        var grouped = {};
+        slots.forEach(function(slot) {
+          var dateStr = slot.date;
+          if (!grouped[dateStr]) {
+            grouped[dateStr] = [];
+          }
+          grouped[dateStr].push(slot);
+        });
+        return grouped;
+      }
+
+      function formatDate(date) {
+        var options = { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' };
+        return date.toLocaleDateString('en-US', options);
+      }
+
+      function navigateToMenu() {
+        window.top.location.reload();
+      }
+
+      function showLoading(show) {
+        var indicator = document.getElementById('loadingIndicator');
+        if (show) {
+          indicator.classList.remove('hidden');
+        } else {
+          indicator.classList.add('hidden');
+        }
+      }
+
+      function showError(message) {
+        var errorDiv = document.getElementById('errorMessage');
+        errorDiv.textContent = message;
+        errorDiv.classList.remove('hidden');
+        setTimeout(function() {
+          errorDiv.classList.add('hidden');
+        }, 5000);
+      }
+
+      function showEmptyState() {
+        document.getElementById('emptyState').classList.remove('hidden');
+      }
+
+      function hideAll() {
+        document.getElementById('resultsSection').classList.add('hidden');
+        document.getElementById('emptyState').classList.add('hidden');
+        document.getElementById('errorMessage').classList.add('hidden');
+      }
+    </script>
+  </body>
+</html>
