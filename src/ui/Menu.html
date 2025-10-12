@@ -238,6 +238,12 @@
             document.open();
             document.write(html);
             document.close();
+
+            // Manually trigger initialization after document.write
+            // Different utilities have different initialization functions
+            if (utilityName === 'Availability' && typeof window.initializeAvailabilityScreen === 'function') {
+              window.initializeAvailabilityScreen();
+            }
           })
           .withFailureHandler(function(error) {
             showError('Failed to load utility: ' + error.message);

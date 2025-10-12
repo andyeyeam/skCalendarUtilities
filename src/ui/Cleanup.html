@@ -32,8 +32,23 @@
        * Navigate back to menu
        */
       function navigateToMenu() {
-        // Reload the entire page to return to menu
-        window.top.location.reload();
+        google.script.run
+          .withSuccessHandler(function(html) {
+            // Replace entire document with menu
+            document.open();
+            document.write(html);
+            document.close();
+
+            // Manually trigger initialization after document.write
+            if (typeof window.initializeMenu === 'function') {
+              window.initializeMenu();
+            }
+          })
+          .withFailureHandler(function(error) {
+            console.error('Failed to load menu:', error);
+            alert('Failed to load menu: ' + error.message);
+          })
+          .loadMenu();
       }
     </script>
   </body>

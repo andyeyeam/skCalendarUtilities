@@ -100,23 +100,75 @@
           })
           .getSelectedCalendar();
 
-        // Set default dates (next business day at 09:00 to 4 business days later at 17:30)
-        var nextBusinessDay = getNextBusinessDay(new Date());
-        nextBusinessDay.setHours(9, 0, 0, 0);
+        // Try to restore previous search settings from sessionStorage
+        var cachedStartDateTime = sessionStorage.getItem('availability_startDateTime');
+        var cachedEndDateTime = sessionStorage.getItem('availability_endDateTime');
+        var cachedMinDuration = sessionStorage.getItem('availability_minDuration');
 
-        var fourBusinessDaysLater = addBusinessDays(nextBusinessDay, 4);
-        fourBusinessDaysLater.setHours(17, 30, 0, 0);
+        console.log('Restoring from cache:', { cachedStartDateTime, cachedEndDateTime, cachedMinDuration });
 
-        document.getElementById('startDateTime').value = formatDateTimeLocal(nextBusinessDay);
-        document.getElementById('endDateTime').value = formatDateTimeLocal(fourBusinessDaysLater);
+        if (cachedStartDateTime && cachedEndDateTime) {
+          // Restore from cache
+          console.log('Using cached values');
+          document.getElementById('startDateTime').value = cachedStartDateTime;
+          document.getElementById('endDateTime').value = cachedEndDateTime;
+          if (cachedMinDuration) {
+            document.getElementById('minDuration').value = cachedMinDuration;
+          }
+        } else {
+          // Set default dates (next business day at 09:00 to 4 business days later at 17:30)
+          console.log('Using default values');
+          var nextBusinessDay = getNextBusinessDay(new Date());
+          nextBusinessDay.setHours(9, 0, 0, 0);
 
-        // Add event listeners to update day of week
-        document.getElementById('startDateTime').addEventListener('change', updateStartDayOfWeek);
-        document.getElementById('endDateTime').addEventListener('change', updateEndDayOfWeek);
+          var fourBusinessDaysLater = addBusinessDays(nextBusinessDay, 4);
+          fourBusinessDaysLater.setHours(17, 30, 0, 0);
+
+          var startValue = formatDateTimeLocal(nextBusinessDay);
+          var endValue = formatDateTimeLocal(fourBusinessDaysLater);
+
+          document.getElementById('startDateTime').value = startValue;
+          document.getElementById('endDateTime').value = endValue;
+
+          // Save the initial default values to sessionStorage
+          sessionStorage.setItem('availability_startDateTime', startValue);
+          sessionStorage.setItem('availability_endDateTime', endValue);
+          sessionStorage.setItem('availability_minDuration', '30');
+          console.log('Saved initial defaults to sessionStorage');
+        }
+
+        // Add event listeners to update day of week and save to sessionStorage
+        document.getElementById('startDateTime').addEventListener('change', function() {
+          updateStartDayOfWeek();
+          saveSearchSettings();
+        });
+        document.getElementById('endDateTime').addEventListener('change', function() {
+          updateEndDayOfWeek();
+          saveSearchSettings();
+        });
+        document.getElementById('minDuration').addEventListener('change', saveSearchSettings);
 
         // Initial update of day of week
         updateStartDayOfWeek();
         updateEndDayOfWeek();
+      }
+
+      function saveSearchSettings() {
+        var startDateTime = document.getElementById('startDateTime').value;
+        var endDateTime = document.getElementById('endDateTime').value;
+        var minDuration = document.getElementById('minDuration').value;
+
+        console.log('Saving to sessionStorage:', { startDateTime, endDateTime, minDuration });
+
+        if (startDateTime) {
+          sessionStorage.setItem('availability_startDateTime', startDateTime);
+        }
+        if (endDateTime) {
+          sessionStorage.setItem('availability_endDateTime', endDateTime);
+        }
+        if (minDuration) {
+          sessionStorage.setItem('availability_minDuration', minDuration);
+        }
       }
 
       function formatDateTimeLocal(date) {
@@ -191,6 +243,9 @@
         var startDateTime = document.getElementById('startDateTime').value;
         var endDateTime = document.getElementById('endDateTime').value;
         var minDuration = parseInt(document.getElementById('minDuration').value);
+
+        // Save search settings to sessionStorage
+        saveSearchSettings();
 
         // Client-side validation
         if (!startDateTime || !endDateTime) {
@@ -321,7 +376,22 @@
       }
 
       function navigateToMenu() {
-        window.top.location.reload();
+        google.script.run
+          .withSuccessHandler(function(html) {
+            // Replace entire document with menu
+            document.open();
+            document.write(html);
+            document.close();
+
+            // Manually trigger initialization after document.write
+            if (typeof window.initializeMenu === 'function') {
+              window.initializeMenu();
+            }
+          })
+          .withFailureHandler(function(error) {
+            showError('Failed to load menu: ' + error.message);
+          })
+          .loadMenu();
       }
 
       function showLoading(show) {
