@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calendar Cleanup</title>
+    <?!= include('ui/Styles'); ?>
+  </head>
+  <body>
+    <div class="container">
+      <!-- Back button -->
+      <button class="back-button" onclick="navigateToMenu()">
+        ← Back to Menu
+      </button>
+
+      <h1>Calendar Cleanup</h1>
+
+      <div class="card">
+        <div class="empty-state">
+          <h3>Coming Soon</h3>
+          <p>Calendar cleanup utilities will be available soon.</p>
+          <p class="text-muted">
+            Features include: duplicate event detection and selective deletion.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      /**
+       * Navigate back to menu
+       */
+      function navigateToMenu() {
+        // Reload the entire page to return to menu
+        window.top.location.reload();
+      }
+    </script>
+  </body>
+</html>
