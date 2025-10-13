@@ -10,7 +10,8 @@
       "Bash(clasp login:*)",
       "Bash(cat:*)",
       "SlashCommand(/speckit.plan Implement the option as a new button on the main menu and then replace the menu with a new screen that lists the availability)",
-      "Bash(clasp push:*)"
+      "Bash(clasp push:*)",
+      "WebSearch"
     ],
     "deny": [],
     "ask": []
