@@ -11,7 +11,9 @@
       "Bash(cat:*)",
       "SlashCommand(/speckit.plan Implement the option as a new button on the main menu and then replace the menu with a new screen that lists the availability)",
       "Bash(clasp push:*)",
-      "WebSearch"
+      "WebSearch",
+      "Read(//c/Users/andre/Repos/speckit/skCalUtils/specs/004-i-would-like/**)",
+      "Read(//c/Users/andre/Repos/speckit/**)"
     ],
     "deny": [],
     "ask": []
