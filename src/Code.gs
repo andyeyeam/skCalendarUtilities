@@ -378,10 +378,39 @@ function findAvailability(startDateStr, endDateStr, minDurationMinutes) {
       };
     });
 
-    // Build response
+    // Fetch calendar events for display (NEW)
+    var calendarEvents = [];
+    var eventsError = null;
+
+    try {
+      var calendar = CalendarApp.getCalendarById(config.selectedCalendarId);
+      calendarEvents = fetchAndFormatEvents(calendar, startDate, endDate);
+    } catch (eventError) {
+      // Graceful degradation: availability still works
+      eventsError = 'Calendar events unavailable. Showing availability only.';
+      Logger.log('Event fetch error: ' + eventError.message);
+    }
+
+    // Serialize calendar events for client (convert Date objects to ISO strings)
+    var serializedEvents = calendarEvents.map(function(event) {
+      return {
+        title: event.title,
+        startTime: event.startTime.toISOString(),
+        endTime: event.endTime.toISOString(),
+        isAllDay: event.isAllDay,
+        date: event.date,
+        formattedStart: event.formattedStart,
+        formattedEnd: event.formattedEnd,
+        formattedDuration: event.formattedDuration,
+        displayTitle: event.displayTitle
+      };
+    });
+
+    // Build enhanced response
     var response = {
       success: true,
       slots: serializedSlots,
+      events: serializedEvents,
       metadata: {
         dateRange: {
           start: startDate.toISOString(),
@@ -389,11 +418,17 @@ function findAvailability(startDateStr, endDateStr, minDurationMinutes) {
         },
         workingDaysCount: countWorkingDays(startDate, endDate),
         totalSlotsFound: serializedSlots.length,
+        totalEventsFound: serializedEvents.length,
         calendarId: config.selectedCalendarId
       }
     };
 
-    log('findAvailability completed', { slotsFound: serializedSlots.length });
+    // Add eventsError if present
+    if (eventsError) {
+      response.eventsError = eventsError;
+    }
+
+    log('findAvailability completed', { slotsFound: serializedSlots.length, eventsFound: serializedEvents.length });
     return response;
   } catch (e) {
     error('findAvailability failed', e);

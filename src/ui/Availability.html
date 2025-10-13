@@ -70,6 +70,44 @@
       .button-secondary:active {
         background-color: #ddd;
       }
+
+      /* Section headers for Available/Scheduled */
+      .section-header {
+        font-weight: 600;
+        font-size: 0.875rem;
+        color: #666;
+        margin-top: 0.75rem;
+        margin-bottom: 0.5rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      /* Event items */
+      .event-item {
+        background-color: #fafafa;
+        padding: 0.5rem;
+        border-radius: 4px;
+        margin-bottom: 0.25rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+      }
+
+      .event-item:last-child {
+        border-bottom: none;
+      }
+
+      .event-time {
+        font-size: 0.875rem;
+        color: #666;
+        font-weight: 400;
+      }
+
+      .event-title {
+        font-size: 1rem;
+        color: #333;
+        font-weight: 500;
+      }
     </style>
   </head>
   <body>
@@ -567,6 +605,7 @@
       // State
       let selectedCalendar = null;
       var allAvailableSlots = []; // Store all slots for clipboard operations
+      var allCalendarEvents = []; // Store all calendar events for display
 
       // Initialize on load
       if (document.readyState === 'loading') {
@@ -799,14 +838,23 @@
       function displayResults(response, minDuration) {
         console.log('displayResults called with', response.slots.length, 'slots');
 
-        if (response.slots.length === 0) {
-          console.log('No slots found, showing empty state');
+        // Store slots globally for clipboard operations
+        allAvailableSlots = response.slots;
+
+        // Store calendar events globally for display
+        allCalendarEvents = response.events || [];
+
+        // Show empty state only if BOTH slots and events are empty
+        if (response.slots.length === 0 && allCalendarEvents.length === 0) {
+          console.log('No slots or events found, showing empty state');
           showEmptyState();
           return;
         }
 
-        // Store slots globally for clipboard operations
-        allAvailableSlots = response.slots;
+        // Check for events error and show warning if present
+        if (response.eventsError) {
+          showMessage(response.eventsError, 'error');
+        }
 
         // Show metadata
         var metadata = response.metadata;
@@ -826,32 +874,58 @@
         var slotsByDate = groupSlotsByDate(response.slots);
         console.log('Grouped slots:', slotsByDate);
 
-        // Render slots
-        var slotsHtml = '';
+        // Group events by date
+        var eventsByDate = groupEventsByDate(allCalendarEvents);
+        console.log('Grouped events:', eventsByDate);
+
+        // Get all unique dates (from both slots and events)
+        var allDates = {};
         for (var dateStr in slotsByDate) {
-          var dateSlots = slotsByDate[dateStr];
-          console.log('Rendering date:', dateStr, 'with', dateSlots.length, 'slots');
+          allDates[dateStr] = true;
+        }
+        for (var dateStr in eventsByDate) {
+          allDates[dateStr] = true;
+        }
+
+        // Sort dates chronologically
+        var sortedDates = Object.keys(allDates).sort();
+        console.log('All dates to render:', sortedDates);
+
+        // Render slots and events together for all dates
+        var slotsHtml = '';
+        sortedDates.forEach(function(dateStr) {
+          var dateSlots = slotsByDate[dateStr] || [];
+          var dateEvents = eventsByDate[dateStr] || [];
+          console.log('Rendering date:', dateStr, 'with', dateSlots.length, 'slots and', dateEvents.length, 'events');
+
           slotsHtml += '<div class="card mb-2">';
           slotsHtml += '<h3 style="font-size: 1.125rem; margin-bottom: 0.5rem;">' + formatDate(new Date(dateStr)) + '</h3>';
           slotsHtml += '<div>';
 
-          dateSlots.forEach(function(slot) {
-            var slotId = getSlotId(slot);
-            var isSelected = SelectionManager.isSelected(slotId);
+          // Render Available section (existing slots)
+          if (dateSlots.length > 0) {
+            slotsHtml += '<div class="section-header">Available</div>';
+            dateSlots.forEach(function(slot) {
+              var slotId = getSlotId(slot);
+              var isSelected = SelectionManager.isSelected(slotId);
 
-            slotsHtml += '<div class="slot-item' + (isSelected ? ' selected' : '') + '">';
-            slotsHtml += '<label class="slot-label">';
-            slotsHtml += '<input type="checkbox" class="slot-checkbox" data-slot-id="' + slotId + '" ' +
-                         'onchange="handleSlotToggle(this)" ' + (isSelected ? 'checked' : '') + '>';
-            slotsHtml += '<span class="slot-time">' + slot.formattedStart + ' - ' + slot.formattedEnd + '</span>';
-            slotsHtml += '<span class="slot-duration">(' + slot.formattedDuration + ')</span>';
-            slotsHtml += '</label>';
-            slotsHtml += '</div>';
-          });
+              slotsHtml += '<div class="slot-item' + (isSelected ? ' selected' : '') + '">';
+              slotsHtml += '<label class="slot-label">';
+              slotsHtml += '<input type="checkbox" class="slot-checkbox" data-slot-id="' + slotId + '" ' +
+                           'onchange="handleSlotToggle(this)" ' + (isSelected ? 'checked' : '') + '>';
+              slotsHtml += '<span class="slot-time">' + slot.formattedStart + ' - ' + slot.formattedEnd + '</span>';
+              slotsHtml += '<span class="slot-duration">(' + slot.formattedDuration + ')</span>';
+              slotsHtml += '</label>';
+              slotsHtml += '</div>';
+            });
+          }
+
+          // Render Scheduled section (new events)
+          slotsHtml += renderScheduledSection(dateEvents);
 
           slotsHtml += '</div>';
           slotsHtml += '</div>';
-        }
+        });
 
         console.log('Slots HTML length:', slotsHtml.length);
         document.getElementById('resultsSlots').innerHTML = slotsHtml;
@@ -873,6 +947,45 @@
           grouped[dateStr].push(slot);
         });
         return grouped;
+      }
+
+      /**
+       * Group calendar events by date
+       * @param {Array<Object>} events - Array of calendar event objects
+       * @returns {Object} Events grouped by date string (YYYY-MM-DD)
+       */
+      function groupEventsByDate(events) {
+        var grouped = {};
+        events.forEach(function(event) {
+          var dateStr = event.date;
+          if (!grouped[dateStr]) {
+            grouped[dateStr] = [];
+          }
+          grouped[dateStr].push(event);
+        });
+        return grouped;
+      }
+
+      /**
+       * Render scheduled events section for a single date
+       * @param {Array<Object>} events - Array of calendar events for this date
+       * @returns {string} HTML string for the scheduled section
+       */
+      function renderScheduledSection(events) {
+        if (!events || events.length === 0) {
+          return ''; // Return empty string if no events
+        }
+
+        var html = '<div class="section-header">Scheduled</div>';
+
+        events.forEach(function(event) {
+          html += '<div class="event-item">';
+          html += '<span class="event-time">' + event.formattedStart + ' - ' + event.formattedEnd + '</span>';
+          html += '<span class="event-title">' + event.displayTitle + '</span>';
+          html += '</div>';
+        });
+
+        return html;
       }
 
       function formatDate(date) {
