@@ -24,27 +24,6 @@
 
       <!-- Utility Menu -->
       <nav class="menu">
-        <button onclick="navigateToUtility('BulkOps')" id="bulkOpsBtn" disabled>
-          <strong>Bulk Operations</strong>
-          <div style="font-size: 0.875rem; font-weight: 400; margin-top: 0.25rem;">
-            Perform bulk actions on events: delete, change color, or move calendar
-          </div>
-        </button>
-
-        <button onclick="navigateToUtility('Analytics')" id="analyticsBtn" disabled>
-          <strong>Analytics & Insights</strong>
-          <div style="font-size: 0.875rem; font-weight: 400; margin-top: 0.25rem;">
-            View time allocation and scheduling patterns in your calendar
-          </div>
-        </button>
-
-        <button onclick="navigateToUtility('Cleanup')" id="cleanupBtn" disabled>
-          <strong>Calendar Cleanup</strong>
-          <div style="font-size: 0.875rem; font-weight: 400; margin-top: 0.25rem;">
-            Find and remove duplicate events to keep your calendar organized
-          </div>
-        </button>
-
         <button onclick="navigateToUtility('Availability')" id="availabilityBtn" disabled>
           <strong>Find Availability</strong>
           <div style="font-size: 0.875rem; font-weight: 400; margin-top: 0.25rem;">
@@ -256,9 +235,6 @@
        * Enable utility buttons
        */
       function enableUtilityButtons() {
-        document.getElementById('bulkOpsBtn').disabled = false;
-        document.getElementById('analyticsBtn').disabled = false;
-        document.getElementById('cleanupBtn').disabled = false;
         document.getElementById('availabilityBtn').disabled = false;
       }
 
@@ -266,9 +242,6 @@
        * Disable utility buttons
        */
       function disableUtilityButtons() {
-        document.getElementById('bulkOpsBtn').disabled = true;
-        document.getElementById('analyticsBtn').disabled = true;
-        document.getElementById('cleanupBtn').disabled = true;
         document.getElementById('availabilityBtn').disabled = true;
       }
 
