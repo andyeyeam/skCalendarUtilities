@@ -68,16 +68,7 @@ function markIntervalsAsBusy(intervals, events) {
 
   // Process each event
   events.forEach(function(event) {
-    // Handle all-day events (FR-014: block entire working day)
-    if (event.isAllDay) {
-      // Mark all intervals as busy
-      intervals.forEach(function(interval) {
-        interval.isBusy = true;
-      });
-      return;
-    }
-
-    // For regular events, clip to working hours (FR-012)
+    // Clip events to working hours (FR-012)
     var clipped = clipToWorkingHours(event.startTime, event.endTime, intervalDate);
     var eventStart = clipped.start;
     var eventEnd = clipped.end;
@@ -262,11 +253,11 @@ function calculateAvailability(events, startDate, endDate, durationMinutes) {
     dayEnd.setHours(23, 59, 59, 999);
 
     var dayEvents = events.filter(function(event) {
-      // Include event if it overlaps with this day
-      return event.startTime < dayEnd && event.endTime > dayStart;
+      // Include event if it overlaps with this day AND is not an all-day event
+      return event.startTime < dayEnd && event.endTime > dayStart && !event.isAllDay;
     });
 
-    // Log events for this day
+    // Log events for this day (excluding all-day events)
     log('Events found for day', {
       day: day.toISOString().split('T')[0],
       eventCount: dayEvents.length,
@@ -279,17 +270,6 @@ function calculateAvailability(events, startDate, endDate, durationMinutes) {
         };
       })
     });
-
-    // Check if this day has any all-day events (blocks entire working day)
-    var hasAllDayEvent = dayEvents.some(function(event) {
-      return event.isAllDay;
-    });
-
-    if (hasAllDayEvent) {
-      // Entire working day is blocked, skip this day
-      log('Day has all-day event, skipping', { day: day.toISOString().split('T')[0] });
-      return;
-    }
 
     // Generate discrete intervals of the requested duration
     // IMPORTANT: We need to create times in the script's timezone, not UTC
@@ -410,11 +390,11 @@ function calculateContiguousAvailability(events, startDate, endDate) {
     dayEnd.setHours(23, 59, 59, 999);
 
     var dayEvents = events.filter(function(event) {
-      // Include event if it overlaps with this day
-      return event.startTime < dayEnd && event.endTime > dayStart;
+      // Include event if it overlaps with this day AND is not an all-day event
+      return event.startTime < dayEnd && event.endTime > dayStart && !event.isAllDay;
     });
 
-    // Log events for this day
+    // Log events for this day (excluding all-day events)
     log('Contiguous mode: Events found for day', {
       day: day.toISOString().split('T')[0],
       eventCount: dayEvents.length
