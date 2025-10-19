@@ -129,6 +129,21 @@
       <!-- Search form -->
       <div class="card mb-3">
         <form id="searchForm" onsubmit="handleFindAvailability(event); return false;">
+          <!-- Search Mode Selection -->
+          <div class="form-group">
+            <label>Search Mode:</label>
+            <div style="display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.5rem;">
+              <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                <input type="radio" name="searchMode" value="duration" checked onchange="handleModeChange()">
+                <span><strong>Duration-based slots</strong> - Find slots of specific duration</span>
+              </label>
+              <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                <input type="radio" name="searchMode" value="contiguous" onchange="handleModeChange()">
+                <span><strong>Contiguous blocks</strong> - Show all uninterrupted free time</span>
+              </label>
+            </div>
+          </div>
+
           <div class="form-group">
             <label for="startDateTime">From Date+Time: <span id="startDayOfWeek" style="color: #666; font-weight: normal;"></span></label>
             <input type="datetime-local" id="startDateTime" required>
@@ -602,6 +617,46 @@
         }, duration);
       }
 
+      // ============================================================================
+      // MODE SELECTION MANAGEMENT
+      // ============================================================================
+
+      /**
+       * Handle search mode change (duration vs contiguous)
+       */
+      function handleModeChange() {
+        var selectedMode = document.querySelector('input[name="searchMode"]:checked').value;
+
+        // Save mode to session storage
+        sessionStorage.setItem('availability_searchMode', selectedMode);
+
+        // Show/hide duration input based on mode
+        updateDurationFieldVisibility();
+      }
+
+      /**
+       * Update visibility and requirement of duration input based on selected mode
+       */
+      function updateDurationFieldVisibility() {
+        var selectedMode = document.querySelector('input[name="searchMode"]:checked').value;
+        var durationGroup = document.getElementById('minDuration').closest('.form-group');
+        var durationInput = document.getElementById('minDuration');
+
+        if (selectedMode === 'contiguous') {
+          // Hide duration input in contiguous mode (not needed)
+          durationGroup.style.display = 'none';
+          durationInput.removeAttribute('required');
+          durationInput.value = '15'; // Set to minimum for server-side granularity
+        } else {
+          // Show duration input in duration mode
+          durationGroup.style.display = 'block';
+          durationInput.setAttribute('required', 'required');
+          // Restore previous value if cached, otherwise default to 30
+          var cachedDuration = sessionStorage.getItem('availability_minDuration') || '30';
+          durationInput.value = cachedDuration;
+        }
+      }
+
       // State
       let selectedCalendar = null;
       var allAvailableSlots = []; // Store all slots for clipboard operations
@@ -634,8 +689,9 @@
         var cachedStartDateTime = sessionStorage.getItem('availability_startDateTime');
         var cachedEndDateTime = sessionStorage.getItem('availability_endDateTime');
         var cachedMinDuration = sessionStorage.getItem('availability_minDuration');
+        var cachedSearchMode = sessionStorage.getItem('availability_searchMode') || 'duration';
 
-        console.log('Restoring from cache:', { cachedStartDateTime, cachedEndDateTime, cachedMinDuration });
+        console.log('Restoring from cache:', { cachedStartDateTime, cachedEndDateTime, cachedMinDuration, cachedSearchMode });
 
         if (cachedStartDateTime && cachedEndDateTime) {
           // Restore from cache
@@ -667,6 +723,15 @@
           console.log('Saved initial defaults to sessionStorage');
         }
 
+        // Restore search mode and update UI
+        var modeRadios = document.querySelectorAll('input[name="searchMode"]');
+        modeRadios.forEach(function(radio) {
+          if (radio.value === cachedSearchMode) {
+            radio.checked = true;
+          }
+        });
+        updateDurationFieldVisibility();
+
         // Add event listeners to update day of week and save to sessionStorage
         document.getElementById('startDateTime').addEventListener('change', function() {
           updateStartDayOfWeek();
@@ -687,8 +752,9 @@
         var startDateTime = document.getElementById('startDateTime').value;
         var endDateTime = document.getElementById('endDateTime').value;
         var minDuration = document.getElementById('minDuration').value;
+        var searchMode = document.querySelector('input[name="searchMode"]:checked').value;
 
-        console.log('Saving to sessionStorage:', { startDateTime, endDateTime, minDuration });
+        console.log('Saving to sessionStorage:', { startDateTime, endDateTime, minDuration, searchMode });
 
         if (startDateTime) {
           sessionStorage.setItem('availability_startDateTime', startDateTime);
@@ -698,6 +764,9 @@
         }
         if (minDuration) {
           sessionStorage.setItem('availability_minDuration', minDuration);
+        }
+        if (searchMode) {
+          sessionStorage.setItem('availability_searchMode', searchMode);
         }
       }
 
@@ -773,6 +842,7 @@
         var startDateTime = document.getElementById('startDateTime').value;
         var endDateTime = document.getElementById('endDateTime').value;
         var minDuration = parseInt(document.getElementById('minDuration').value);
+        var searchMode = document.querySelector('input[name="searchMode"]:checked').value;
 
         // Save search settings to sessionStorage
         saveSearchSettings();
@@ -814,7 +884,7 @@
         hideAll();
         showLoading(true);
 
-        // Call server with date-time range and minimum duration
+        // Call server with date-time range, minimum duration, and search mode
         google.script.run
           .withSuccessHandler(function(response) {
             console.log('Server response:', response);
@@ -832,7 +902,7 @@
             showLoading(false);
             showError('Server error: ' + error.message);
           })
-          .findAvailability(startDateTime, endDateTime, minDuration);
+          .findAvailability(startDateTime, endDateTime, minDuration, searchMode);
       }
 
       function displayResults(response, minDuration) {
@@ -859,12 +929,22 @@
         // Show metadata
         var metadata = response.metadata;
         console.log('Metadata:', metadata);
-        var durationText = minDuration && minDuration > 15 ? '<br>Minimum duration: ' + minDuration + ' minutes' : '';
+
+        // Format search mode display with visual emphasis
+        var modeText = '';
+        if (metadata.searchMode === 'contiguous') {
+          modeText = '<br>Mode: <span style="background-color: #f0f7ff; padding: 0.125rem 0.5rem; border-radius: 3px; font-weight: 600;">Contiguous availability blocks</span>';
+        } else {
+          modeText = '<br>Mode: <span style="background-color: #f0f7ff; padding: 0.125rem 0.5rem; border-radius: 3px; font-weight: 600;">Duration-based slots</span>';
+        }
+
+        var durationText = minDuration && minDuration > 15 && metadata.searchMode === 'duration' ? '<br>Minimum duration: ' + minDuration + ' minutes' : '';
         var metadataHtml = '<p><strong>Search Results</strong></p>' +
           '<p class="text-muted" style="font-size: 0.875rem;">' +
           'Date range: ' + formatDate(new Date(metadata.dateRange.start)) + ' - ' + formatDate(new Date(metadata.dateRange.end)) + '<br>' +
           'Working days: ' + metadata.workingDaysCount + '<br>' +
           'Available slots: ' + metadata.totalSlotsFound +
+          modeText +
           durationText +
           '</p>';
         document.getElementById('resultsMetadata').innerHTML = metadataHtml;

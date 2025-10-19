@@ -380,3 +380,78 @@ function calculateAvailability(events, startDate, endDate, durationMinutes) {
 
   return availableSlots;
 }
+
+/**
+ * Calculate contiguous availability blocks across a date range
+ * Returns all uninterrupted free time blocks without filtering by minimum duration
+ * @param {Array<Object>} events - Array of CalendarEvent objects
+ * @param {Date} startDate - Start of date range
+ * @param {Date} endDate - End of date range
+ * @returns {Array<Object>} Array of TimeSlot objects for contiguous availability blocks, sorted by date then time
+ */
+function calculateContiguousAvailability(events, startDate, endDate) {
+  var availableSlots = [];
+
+  // Get all days in range
+  var days = getDaysBetween(startDate, endDate);
+
+  // Process each working day
+  days.forEach(function(day) {
+    // Skip weekends (FR-004)
+    if (!isWorkingDay(day)) {
+      return;
+    }
+
+    // Filter events to this day
+    var dayStart = new Date(day);
+    dayStart.setHours(0, 0, 0, 0);
+
+    var dayEnd = new Date(day);
+    dayEnd.setHours(23, 59, 59, 999);
+
+    var dayEvents = events.filter(function(event) {
+      // Include event if it overlaps with this day
+      return event.startTime < dayEnd && event.endTime > dayStart;
+    });
+
+    // Log events for this day
+    log('Contiguous mode: Events found for day', {
+      day: day.toISOString().split('T')[0],
+      eventCount: dayEvents.length
+    });
+
+    // Generate 15-minute intervals for granularity
+    var intervals = generateWorkingDayIntervals(day);
+
+    // Mark intervals as busy based on calendar events
+    markIntervalsAsBusy(intervals, dayEvents);
+
+    // Convert marked intervals to contiguous time slots (merges consecutive free intervals)
+    var daySlots = intervalsToTimeSlots(intervals);
+
+    // Add this day's slots to the overall collection
+    availableSlots = availableSlots.concat(daySlots);
+
+    log('Contiguous mode: Slots found for day', {
+      day: day.toISOString().split('T')[0],
+      slotCount: daySlots.length
+    });
+  });
+
+  // Sort slots by date, then by time (FR-007: chronological order)
+  availableSlots.sort(function(a, b) {
+    // First sort by date string (YYYY-MM-DD format sorts correctly as strings)
+    var dateCompare = a.date.localeCompare(b.date);
+    if (dateCompare !== 0) {
+      return dateCompare;
+    }
+    // Then sort by start time
+    return a.startTime.getTime() - b.startTime.getTime();
+  });
+
+  log('Contiguous mode: Total slots found', {
+    totalSlots: availableSlots.length
+  });
+
+  return availableSlots;
+}

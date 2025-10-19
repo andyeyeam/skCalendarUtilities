@@ -326,16 +326,24 @@ function createErrorPage(message) {
  * @param {string} startDateStr - Start date (ISO 8601 YYYY-MM-DD)
  * @param {string} endDateStr - End date (ISO 8601 YYYY-MM-DD)
  * @param {number} minDurationMinutes - Minimum slot duration (optional, default 15)
+ * @param {string} searchMode - Search mode: "duration" or "contiguous" (optional, default "duration")
  * @returns {Object} AvailabilityResponse with slots or error
  */
-function findAvailability(startDateStr, endDateStr, minDurationMinutes) {
+function findAvailability(startDateStr, endDateStr, minDurationMinutes, searchMode) {
   try {
-    log('findAvailability started', { startDateStr, endDateStr, minDurationMinutes });
+    log('findAvailability started', { startDateStr, endDateStr, minDurationMinutes, searchMode });
 
     // Parse dates
     var startDate = new Date(startDateStr);
     var endDate = new Date(endDateStr);
     minDurationMinutes = minDurationMinutes || 15;
+
+    // Validate and default search mode (backward compatible)
+    searchMode = searchMode || 'duration';
+    if (searchMode !== 'duration' && searchMode !== 'contiguous') {
+      log('Invalid searchMode, defaulting to duration', { providedMode: searchMode });
+      searchMode = 'duration';
+    }
 
     // Get selected calendar
     var config = getConfig();
@@ -362,8 +370,17 @@ function findAvailability(startDateStr, endDateStr, minDurationMinutes) {
     // Get calendar events
     var events = getCalendarEvents(config.selectedCalendarId, startDate, endDate);
 
-    // Calculate availability
-    var slots = calculateAvailability(events, startDate, endDate, minDurationMinutes);
+    // Calculate availability based on search mode
+    var slots;
+    if (searchMode === 'contiguous') {
+      // Contiguous mode: return all uninterrupted free time blocks
+      log('Using contiguous availability mode');
+      slots = calculateContiguousAvailability(events, startDate, endDate);
+    } else {
+      // Duration mode: return discrete slots of specified duration
+      log('Using duration-based availability mode', { minDuration: minDurationMinutes });
+      slots = calculateAvailability(events, startDate, endDate, minDurationMinutes);
+    }
 
     // Serialize slots for client (convert Date objects to ISO strings)
     var serializedSlots = slots.map(function(slot) {
@@ -419,7 +436,8 @@ function findAvailability(startDateStr, endDateStr, minDurationMinutes) {
         workingDaysCount: countWorkingDays(startDate, endDate),
         totalSlotsFound: serializedSlots.length,
         totalEventsFound: serializedEvents.length,
-        calendarId: config.selectedCalendarId
+        calendarId: config.selectedCalendarId,
+        searchMode: searchMode
       }
     };
 
