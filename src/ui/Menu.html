@@ -30,6 +30,13 @@
             Find available time slots in your calendar for scheduling meetings
           </div>
         </button>
+
+        <button onclick="navigateToUtility('OneToOne')" id="oneToOneBtn" disabled>
+          <strong>One-to-One Scheduler</strong>
+          <div style="font-size: 0.875rem; font-weight: 400; margin-top: 0.25rem;">
+            Automatically schedule and manage recurring one-to-one meetings with your team
+          </div>
+        </button>
       </nav>
 
       <!-- Loading indicator -->
@@ -236,6 +243,7 @@
        */
       function enableUtilityButtons() {
         document.getElementById('availabilityBtn').disabled = false;
+        document.getElementById('oneToOneBtn').disabled = false;
       }
 
       /**
@@ -243,6 +251,7 @@
        */
       function disableUtilityButtons() {
         document.getElementById('availabilityBtn').disabled = true;
+        document.getElementById('oneToOneBtn').disabled = true;
       }
 
       /**

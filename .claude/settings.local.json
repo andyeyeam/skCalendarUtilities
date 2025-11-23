@@ -13,7 +13,20 @@
       "Bash(clasp push:*)",
       "WebSearch",
       "Read(//c/Users/andre/Repos/speckit/skCalUtils/specs/004-i-would-like/**)",
-      "Read(//c/Users/andre/Repos/speckit/**)"
+      "Read(//c/Users/andre/Repos/speckit/**)",
+      "WebFetch(domain:developers.google.com)",
+      "Bash(if [ -d \"src/models\" ])",
+      "Bash(then echo \"models exists\")",
+      "Bash(else mkdir -p src/models)",
+      "Bash(fi)",
+      "Bash(if [ -d \"src/utils\" ])",
+      "Bash(then echo \"utils exists\")",
+      "Bash(else echo \"utils missing\")",
+      "Bash(if [ -d \"src/ui\" ])",
+      "Bash(then echo \"ui exists\")",
+      "Bash(else echo \"ui missing\")",
+      "Bash(clasp logout:*)",
+      "Bash(git add:*)"
     ],
     "deny": [],
     "ask": []

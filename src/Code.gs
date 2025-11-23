@@ -49,13 +49,13 @@ function include(filename) {
 
 /**
  * Load a utility HTML page
- * @param {string} utilityName - Name of utility (BulkOps, Analytics, Cleanup)
+ * @param {string} utilityName - Name of utility (BulkOps, Analytics, Cleanup, Availability, OneToOne)
  * @returns {string} HTML content for the utility
  */
 function loadUtility(utilityName) {
   try {
     // Validate utility name (prevent directory traversal)
-    const validUtilities = ['BulkOps', 'Analytics', 'Cleanup', 'Availability'];
+    const validUtilities = ['BulkOps', 'Analytics', 'Cleanup', 'Availability', 'OneToOne'];
     if (!validUtilities.includes(utilityName)) {
       throw new Error('Invalid utility name');
     }
@@ -481,3 +481,22 @@ function getSelectedCalendar() {
     return { success: false, error: e.message };
   }
 }
+
+// ============================================================================
+// One-to-One Meeting Scheduler Functions
+// ============================================================================
+
+// Note: The actual implementation functions are in src/services/*.gs files
+// These wrapper functions expose them to the client via google.script.run
+
+// People Management (from PeopleService.gs)
+// Functions: addPerson, editPerson, deletePerson, listPeople are already exposed
+
+// Meeting Slots Management (from MeetingSlotService.gs)
+// Functions: addMeetingSlot, editMeetingSlot, deleteMeetingSlot, listMeetingSlots are already exposed
+
+// One-to-One Config (from OneToOneConfigService.gs)
+// Functions: getOneToOneConfig, updateOneToOneConfig are already exposed
+
+// Scheduling (from SchedulingService.gs)
+// Functions: scheduleMeetings, viewMeetings are already exposed

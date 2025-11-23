@@ -13,22 +13,26 @@ const QUEUE_TAB_NAME = 'BulkOpQueue';
  */
 function getOrCreateConfigSheet() {
   try {
+    var spreadsheet;
+
     // Search for existing config sheet
     const files = DriveApp.getFilesByName(CONFIG_SHEET_NAME);
 
     if (files.hasNext()) {
       const file = files.next();
-      const spreadsheet = SpreadsheetApp.openById(file.getId());
+      spreadsheet = SpreadsheetApp.openById(file.getId());
       log('Found existing config sheet', { id: file.getId() });
-      return spreadsheet;
+    } else {
+      // Create new config sheet
+      spreadsheet = SpreadsheetApp.create(CONFIG_SHEET_NAME);
+      log('Created new config sheet', { id: spreadsheet.getId() });
+
+      // Initialize sheet structure
+      initializeConfigSheetStructure(spreadsheet);
     }
 
-    // Create new config sheet
-    const spreadsheet = SpreadsheetApp.create(CONFIG_SHEET_NAME);
-    log('Created new config sheet', { id: spreadsheet.getId() });
-
-    // Initialize sheet structure
-    initializeConfigSheetStructure(spreadsheet);
+    // Always ensure OneToOne tabs exist (for both new and existing sheets)
+    ensureOneToOneTabsExist(spreadsheet);
 
     return spreadsheet;
   } catch (e) {
@@ -229,5 +233,164 @@ function resetConfigToDefaults() {
   } catch (e) {
     error('Failed to reset config to defaults', e);
     return false;
+  }
+}
+
+/**
+ * Ensure One-to-One Meeting Scheduler tabs exist
+ * Internal function that takes spreadsheet as parameter to avoid infinite loop
+ * @param {Spreadsheet} spreadsheet - The spreadsheet to initialize tabs in
+ * @returns {Object} Result object with success status
+ */
+function ensureOneToOneTabsExist(spreadsheet) {
+  try {
+
+    // Tab 1: OneToOnePeople
+    var peopleSheet = spreadsheet.getSheetByName('OneToOnePeople');
+    if (!peopleSheet) {
+      peopleSheet = spreadsheet.insertSheet('OneToOnePeople');
+      var headers = ['PersonId', 'Name', 'CalendarEventId', 'CreatedAt', 'UpdatedAt'];
+      initializeSheetWithHeaders(peopleSheet, headers);
+      log('Created OneToOnePeople tab');
+    }
+
+    // Tab 2: OneToOneConfig
+    var configSheet = spreadsheet.getSheetByName('OneToOneConfig');
+    if (!configSheet) {
+      configSheet = spreadsheet.insertSheet('OneToOneConfig');
+      var headers = ['Key', 'Value'];
+      initializeSheetWithHeaders(configSheet, headers);
+
+      // Write default configuration
+      var defaultConfig = [
+        ['meetingDurationMinutes', '30'],
+        ['minRecurrenceIntervalWeeks', '1'],
+        ['calculatedRecurrenceWeeks', '1']
+      ];
+      batchWrite(configSheet, defaultConfig, 2);
+      log('Created OneToOneConfig tab with defaults');
+    }
+
+    // Tab 3: OneToOneSlots
+    var slotsSheet = spreadsheet.getSheetByName('OneToOneSlots');
+    if (!slotsSheet) {
+      slotsSheet = spreadsheet.insertSheet('OneToOneSlots');
+      var headers = ['SlotId', 'Weekday', 'StartTime', 'EndTime', 'CreatedAt'];
+      initializeSheetWithHeaders(slotsSheet, headers);
+      log('Created OneToOneSlots tab');
+    }
+
+    log('One-to-One tabs initialization complete');
+    return { success: true };
+  } catch (e) {
+    error('Failed to initialize One-to-One tabs', e);
+    return { success: false, error: e.message };
+  }
+}
+
+/**
+ * Initialize One-to-One Meeting Scheduler tabs
+ * Public wrapper function that gets the spreadsheet and calls ensureOneToOneTabsExist
+ * @returns {Object} Result object with success status
+ */
+function initializeOneToOneTabs() {
+  try {
+    var spreadsheet = getOrCreateConfigSheet();
+    return ensureOneToOneTabsExist(spreadsheet);
+  } catch (e) {
+    error('Failed to initialize One-to-One tabs', e);
+    return { success: false, error: e.message };
+  }
+}
+
+/**
+ * Test function to verify One-to-One tabs initialization
+ * Verifies tabs exist and default config values are set correctly
+ * @returns {Object} Verification results
+ */
+function testInitializeOneToOneTabs() {
+  try {
+    // Initialize tabs
+    var result = initializeOneToOneTabs();
+    if (!result.success) {
+      return { success: false, error: 'Initialization failed: ' + result.error };
+    }
+
+    var spreadsheet = getOrCreateConfigSheet();
+    var results = {
+      success: true,
+      tabs: {},
+      config: {},
+      errors: []
+    };
+
+    // Verify OneToOnePeople tab
+    var peopleSheet = spreadsheet.getSheetByName('OneToOnePeople');
+    if (peopleSheet) {
+      var peopleData = batchRead(peopleSheet);
+      results.tabs.OneToOnePeople = {
+        exists: true,
+        headers: peopleData.length > 0 ? peopleData[0] : [],
+        rowCount: peopleData.length
+      };
+    } else {
+      results.errors.push('OneToOnePeople tab not found');
+      results.success = false;
+    }
+
+    // Verify OneToOneConfig tab
+    var configSheet = spreadsheet.getSheetByName('OneToOneConfig');
+    if (configSheet) {
+      var configData = batchRead(configSheet);
+      results.tabs.OneToOneConfig = {
+        exists: true,
+        headers: configData.length > 0 ? configData[0] : [],
+        rowCount: configData.length
+      };
+
+      // Verify default config values
+      if (configData.length > 1) {
+        for (var i = 1; i < configData.length; i++) {
+          results.config[configData[i][0]] = configData[i][1];
+        }
+      }
+    } else {
+      results.errors.push('OneToOneConfig tab not found');
+      results.success = false;
+    }
+
+    // Verify OneToOneSlots tab
+    var slotsSheet = spreadsheet.getSheetByName('OneToOneSlots');
+    if (slotsSheet) {
+      var slotsData = batchRead(slotsSheet);
+      results.tabs.OneToOneSlots = {
+        exists: true,
+        headers: slotsData.length > 0 ? slotsData[0] : [],
+        rowCount: slotsData.length
+      };
+    } else {
+      results.errors.push('OneToOneSlots tab not found');
+      results.success = false;
+    }
+
+    // Verify expected default config values
+    var expectedConfig = {
+      'meetingDurationMinutes': '30',
+      'minRecurrenceIntervalWeeks': '1',
+      'calculatedRecurrenceWeeks': '1'
+    };
+
+    for (var key in expectedConfig) {
+      if (results.config[key] !== expectedConfig[key]) {
+        results.errors.push('Config mismatch for ' + key + ': expected ' + expectedConfig[key] + ', got ' + results.config[key]);
+        results.success = false;
+      }
+    }
+
+    log('One-to-One tabs verification complete', results);
+    return results;
+  } catch (e) {
+    error('Failed to verify One-to-One tabs', e);
+    return { success: false, error: e.message };
   }
 }
