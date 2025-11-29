@@ -16,30 +16,44 @@ Auto-generated from all feature plans. Last updated: 2025-01-12
 ```
 src/
 ├── ui/
-│   ├── Availability.html          # Main availability search UI (002, 003, 004)
+│   ├── Availability.html          # Main availability search UI (002, 003, 004, 005)
+│   ├── OneToOne.html              # One-to-one meeting scheduler UI (006)
 │   ├── Styles.html                # Shared styles
-│   └── Menu.html                  # Main menu navigation
+│   ├── Menu.html                  # Main menu navigation
+│   ├── Analytics.html             # Analytics UI placeholder
+│   ├── BulkOps.html               # Bulk operations UI placeholder
+│   └── Cleanup.html               # Cleanup UI placeholder
 ├── services/
-│   ├── AvailabilityService.gs     # Server-side availability logic
-│   └── CalendarEventService.gs    # Calendar event fetching (004)
+│   ├── AvailabilityService.gs     # Server-side availability logic (002, 005)
+│   ├── CalendarEventService.gs    # Calendar event fetching (004)
+│   ├── PeopleService.gs           # People management CRUD (006)
+│   ├── MeetingSlotService.gs      # Meeting slot configuration (006)
+│   ├── OneToOneConfigService.gs   # One-to-one config management (006)
+│   └── SchedulingService.gs       # Meeting scheduling logic (006)
 ├── models/
-│   ├── TimeSlot.gs                # Time slot data model
-│   └── CalendarEvent.gs           # Calendar event data model (004)
+│   ├── TimeSlot.gs                # Time slot data model (002)
+│   ├── CalendarEvent.gs           # Calendar event data model (004)
+│   ├── Person.gs                  # Person data model (006)
+│   ├── MeetingSlot.gs             # Meeting slot data model with time parsing (006)
+│   └── ScheduledMeeting.gs        # Scheduled meeting data model (006)
+├── utils/
+│   └── ValidationUtils.gs         # Input validation helpers (006)
 └── Code.gs                         # Main Apps Script entry point
 
 specs/
+├── 001-build-an-embedded/         # Initial project setup
 ├── 002-i-want-to/                 # Availability search feature (IMPLEMENTED)
-├── 003-i-want-to/                 # Clipboard copy feature (PLANNING COMPLETE)
-│   ├── spec.md                    # Feature specification
-│   ├── plan.md                    # Implementation plan
-│   ├── research.md                # Phase 0 research findings
-│   ├── data-model.md              # Data structures
-│   ├── quickstart.md              # Implementation guide
-│   ├── contracts/
-│   │   └── clipboard-api.md       # Clipboard API contracts
-│   └── checklists/
-│       └── requirements.md        # Spec validation checklist
-└── 004-i-would-like/              # Calendar event display (IMPLEMENTED)
+├── 003-i-want-to/                 # Clipboard copy feature (PLANNED)
+├── 004-i-would-like/              # Calendar event display (IMPLEMENTED)
+├── 005-add-a-new/                 # Contiguous availability blocks (IMPLEMENTED)
+└── 006-i-would-like/              # One-to-one meeting scheduler (IMPLEMENTED)
+    ├── spec.md                    # Feature specification
+    ├── plan.md                    # Implementation plan
+    ├── research.md                # Technical research
+    ├── data-model.md              # Data structures
+    ├── quickstart.md              # Implementation guide
+    ├── contracts/                 # API specifications
+    └── checklists/                # Validation checklists
 ```
 
 ## Commands
@@ -53,7 +67,13 @@ No build system - Google Apps Script deployed via clasp CLI
 - Comments: JSDoc style for functions
 
 ## Recent Changes
-- 006-i-would-like: Added Google Apps Script (JavaScript ES5+ compatible, V8 runtime) + Google Calendar API (CalendarApp), Google Sheets API (SpreadsheetApp), HTML Service for UI, Session Storage for UI state
+- 006-i-would-like: IMPLEMENTED - One-to-one meeting scheduler with automated recurring event creation, intelligent interval calculation, people/slot management, meeting deletion, and regeneration capabilities (2025-01-29)
+  - New models: Person, MeetingSlot, ScheduledMeeting
+  - New services: PeopleService, MeetingSlotService, OneToOneConfigService, SchedulingService
+  - New UI: OneToOne.html with tabbed interface (People, Settings, Meetings)
+  - New utils: ValidationUtils for input validation
+  - Google Sheets tabs: OneToOnePeople, OneToOneConfig, OneToOneSlots
+  - Bug fix: Time parsing for Date objects from Google Sheets (normalizeTimeValue function)
 - 005-add-a-new: IMPLEMENTED - Contiguous availability blocks feature with mode selection UI, dual search modes (duration-based and contiguous), mode persistence, and comparison UX enhancements (2025-01-19)
 - 004-i-would-like: IMPLEMENTED - Calendar event display feature with event fetching, compact UI rendering, graceful degradation, and multi-day event detection (2025-01-13)
 

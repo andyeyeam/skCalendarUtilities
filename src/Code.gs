@@ -499,4 +499,4 @@ function getSelectedCalendar() {
 // Functions: getOneToOneConfig, updateOneToOneConfig are already exposed
 
 // Scheduling (from SchedulingService.gs)
-// Functions: scheduleMeetings, viewMeetings are already exposed
+// Functions: createAllMeetings, viewMeetings, deleteMeeting, regenerateAllMeetings are already exposed

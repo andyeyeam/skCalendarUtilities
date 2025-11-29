@@ -141,14 +141,14 @@
 
 ### Implementation for User Story 4
 
-- [ ] T061 [P] [US4] Create deleteMeeting(personId) function in SchedulingService.gs - deletes CalendarEventSeries, clears calendarEventId
+- [x] T061 [P] [US4] Create deleteMeeting(personId) function in SchedulingService.gs - deletes CalendarEventSeries, clears calendarEventId
 - [ ] T062 [P] [US4] Create updateMeetingRecurrence(eventId, newIntervalWeeks) helper function in SchedulingService.gs
 - [ ] T063 [P] [US4] Create updateMeetingDuration(eventId, newDurationMinutes) helper function in SchedulingService.gs
-- [ ] T064 [US4] Expose deleteMeeting() in src/Code.gs
-- [ ] T065 [US4] Add delete button to each meeting in meetings list UI
-- [ ] T066 [US4] Implement delete meeting flow: confirmation dialog → deleteMeeting() → success message → refresh list
-- [ ] T067 [US4] Update deletePerson() to handle calendar event deletion when person is removed (integrate with US1)
-- [ ] T068 [US4] Add warning to delete person confirmation: "This will delete [Name]'s recurring meeting"
+- [x] T064 [US4] Expose deleteMeeting() in src/Code.gs
+- [x] T065 [US4] Add delete button to each meeting in meetings list UI
+- [x] T066 [US4] Implement delete meeting flow: confirmation dialog → deleteMeeting() → success message → refresh list
+- [x] T067 [US4] Update deletePerson() to handle calendar event deletion when person is removed (integrate with US1)
+- [x] T068 [US4] Add warning to delete person confirmation: "This will delete [Name]'s recurring meeting"
 - [ ] T069 [US4] Test cascade delete: removing person removes their calendar event
 
 **Checkpoint**: User Story 4 complete - can update and delete individual meetings
@@ -163,12 +163,12 @@
 
 ### Implementation for User Story 5
 
-- [ ] T070 [US5] Create regenerateAllMeetings() function in SchedulingService.gs - deletes all existing meetings, calls createAllMeetings()
-- [ ] T071 [US5] Expose regenerateAllMeetings() in src/Code.gs
-- [ ] T072 [US5] Add "Regenerate All Meetings" button to Meetings tab UI
-- [ ] T073 [US5] Implement regenerate confirmation dialog with warning: "This will delete and recreate ALL meetings. Continue?"
-- [ ] T074 [US5] Implement regenerate flow: confirmation → regenerateAllMeetings() → display deletion/creation summary → refresh list
-- [ ] T075 [US5] Display regeneration summary: X meetings deleted, Y meetings created, new recurrence interval
+- [x] T070 [US5] Create regenerateAllMeetings() function in SchedulingService.gs - deletes all existing meetings, calls createAllMeetings()
+- [x] T071 [US5] Expose regenerateAllMeetings() in src/Code.gs
+- [x] T072 [US5] Add "Regenerate All Meetings" button to Meetings tab UI
+- [x] T073 [US5] Implement regenerate confirmation dialog with warning: "This will delete and recreate ALL meetings. Continue?"
+- [x] T074 [US5] Implement regenerate flow: confirmation → regenerateAllMeetings() → display deletion/creation summary → refresh list
+- [x] T075 [US5] Display regeneration summary: X meetings deleted, Y meetings created, new recurrence interval
 - [ ] T076 [US5] Test regeneration with increased people count (5 → 15 people, verify recurrence interval adjustment)
 
 **Checkpoint**: User Story 5 complete - full regeneration capability available
@@ -189,7 +189,7 @@
 - [ ] T084 Test session storage persistence: verify state survives page refresh
 - [ ] T085 Test performance: verify 20 people scheduling completes in <10 seconds
 - [ ] T086 Test error handling: verify graceful degradation for Calendar API failures
-- [ ] T087 [P] Update CLAUDE.md with OneToOne.html, new models, new services
+- [x] T087 [P] Update CLAUDE.md with OneToOne.html, new models, new services
 - [ ] T088 Validate against quickstart.md: ensure all implementation steps are followed
 - [ ] T089 Manual testing on Google Sites iframe: desktop viewport
 - [ ] T090 Manual testing on Google Sites iframe: mobile viewport

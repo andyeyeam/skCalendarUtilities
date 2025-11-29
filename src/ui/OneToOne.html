@@ -334,6 +334,9 @@
             <button class="button" onclick="handleCreateMeetings()">
               Create Meetings
             </button>
+            <button class="button" onclick="handleRegenerateAllMeetings()" style="background-color: #f5f5f5; color: #333; border: 1px solid #ddd;">
+              Regenerate All Meetings
+            </button>
           </div>
 
           <!-- Meetings Metadata -->
@@ -1364,15 +1367,18 @@
           metadataContainer.style.display = 'block';
         }
 
-        // Build meetings list HTML (T055)
+        // Build meetings list HTML (T055, T065)
         var html = '';
         for (var i = 0; i < meetings.length; i++) {
           var meeting = meetings[i];
 
-          html += '<div class="list-item">' +
+          html += '<div class="list-item" data-person-id="' + escapeHtml(meeting.personId) + '">' +
             '<div class="list-item-info">' +
               '<div class="list-item-name">' + escapeHtml(meeting.personName) + '</div>' +
               '<div class="list-item-detail">' + escapeHtml(meeting.eventTitle) + '</div>' +
+            '</div>' +
+            '<div class="list-item-actions">' +
+              '<button class="button-small button-delete" onclick="handleDeleteMeetingClick(\'' + escapeHtml(meeting.personId) + '\', \'' + escapeHtml(meeting.personName) + '\')">Delete</button>' +
             '</div>' +
           '</div>';
         }
@@ -1384,17 +1390,28 @@
        * Handle create meetings button click (T054)
        */
       function handleCreateMeetings() {
+        console.log('handleCreateMeetings called');
+
         // Pre-scheduling validation (T052)
         if (!confirm('Create recurring meetings for all people?\n\nThis will:\n• Create one recurring calendar event per person\n• Use your configured time slots and settings\n• Calculate optimal recurrence interval\n\nContinue?')) {
+          console.log('User cancelled confirmation');
           return;
         }
 
+        console.log('Starting meeting creation...');
         showLoading();
 
         // Display calculated recurrence info (T053) will be shown in results
         google.script.run
           .withSuccessHandler(function(response) {
+            console.log('createAllMeetings response:', response);
             hideLoading();
+
+            if (!response) {
+              console.error('Null response from createAllMeetings');
+              showError('No response from server. Check browser console for details.');
+              return;
+            }
 
             if (response.success) {
               // Display results (T054)
@@ -1425,14 +1442,187 @@
                 loadPeopleList();
               }
             } else {
+              console.error('Meeting creation failed:', response.error, response.errorType);
               showError(response.error || 'Failed to create meetings');
             }
           })
           .withFailureHandler(function(error) {
+            console.error('createAllMeetings error:', error);
             hideLoading();
             showError('Failed to create meetings: ' + error.message);
           })
           .createAllMeetings();
+      }
+
+      /**
+       * Handle delete meeting button click (T066)
+       */
+      function handleDeleteMeetingClick(personId, personName) {
+        console.log('handleDeleteMeetingClick called', { personId: personId, personName: personName });
+
+        // Confirmation dialog (T066)
+        if (!confirm('Delete meeting for ' + personName + '?\n\nThis will permanently delete the recurring calendar event.\n\nThe person will remain in your group but will no longer have a scheduled meeting.')) {
+          console.log('User cancelled delete meeting');
+          return;
+        }
+
+        // Find the list item and show inline busy indicator
+        var listItem = document.querySelector('[data-person-id="' + personId + '"]');
+        if (listItem) {
+          // Disable the row and show busy state
+          listItem.style.opacity = '0.5';
+          listItem.style.pointerEvents = 'none';
+
+          // Replace action buttons with busy indicator
+          var actionsDiv = listItem.querySelector('.list-item-actions');
+          if (actionsDiv) {
+            actionsDiv.innerHTML = '<span style="color: #666; font-size: 0.875rem;">⏳ Deleting...</span>';
+          }
+        }
+
+        console.log('Deleting meeting for person:', personId);
+        showLoading();
+
+        google.script.run
+          .withSuccessHandler(function(response) {
+            console.log('deleteMeeting response:', response);
+            hideLoading();
+
+            if (!response) {
+              console.error('Null response from deleteMeeting');
+              showError('No response from server. Check browser console for details.');
+              // Restore the row
+              if (listItem) {
+                listItem.style.opacity = '1';
+                listItem.style.pointerEvents = 'auto';
+                loadMeetingsList(); // Reload to restore buttons
+              }
+              return;
+            }
+
+            if (response.success) {
+              // Show success message
+              if (response.warning) {
+                showSuccess(response.warning);
+              } else if (response.eventDeleted) {
+                showSuccess('Meeting deleted for ' + personName);
+              } else {
+                showSuccess(response.message || 'Meeting deleted');
+              }
+
+              // Animate removal and refresh
+              if (listItem) {
+                listItem.style.transition = 'opacity 0.3s ease-out';
+                listItem.style.opacity = '0';
+                setTimeout(function() {
+                  loadMeetingsList();
+                  // Also refresh people list if visible
+                  var activeTab = getActiveTab();
+                  if (activeTab === 'people') {
+                    loadPeopleList();
+                  }
+                }, 300);
+              } else {
+                loadMeetingsList();
+              }
+            } else {
+              console.error('Delete meeting failed:', response.error, response.errorType);
+              // Restore the row on error
+              if (listItem) {
+                listItem.style.opacity = '1';
+                listItem.style.pointerEvents = 'auto';
+              }
+              showError(response.error || 'Failed to delete meeting');
+              loadMeetingsList(); // Reload to restore buttons
+            }
+          })
+          .withFailureHandler(function(error) {
+            console.error('deleteMeeting error:', error);
+            hideLoading();
+            // Restore the row on error
+            if (listItem) {
+              listItem.style.opacity = '1';
+              listItem.style.pointerEvents = 'auto';
+            }
+            showError('Failed to delete meeting: ' + error.message);
+            loadMeetingsList(); // Reload to restore buttons
+          })
+          .deleteMeeting(personId);
+      }
+
+      /**
+       * Handle regenerate all meetings button click (T072-T076)
+       */
+      function handleRegenerateAllMeetings() {
+        console.log('handleRegenerateAllMeetings called');
+
+        // Confirmation dialog with warning (T073)
+        if (!confirm('Regenerate ALL meetings?\n\n⚠️ WARNING: This will:\n• Delete ALL existing recurring calendar events\n• Create new meetings for all people\n• Redistribute meeting times based on current configuration\n\nThis action cannot be undone.\n\nContinue?')) {
+          console.log('User cancelled regeneration');
+          return;
+        }
+
+        console.log('Starting meeting regeneration...');
+        showLoading();
+
+        google.script.run
+          .withSuccessHandler(function(response) {
+            console.log('regenerateAllMeetings response:', response);
+            hideLoading();
+
+            if (!response) {
+              console.error('Null response from regenerateAllMeetings');
+              showError('No response from server. Check browser console for details.');
+              return;
+            }
+
+            if (response.success) {
+              // Display regeneration summary (T074, T075)
+              var meta = response.metadata;
+              var summaryMsg = 'Regeneration Complete!\n\n' +
+                '✓ Deleted: ' + response.deletedCount + ' meeting' + (response.deletedCount === 1 ? '' : 's') + '\n' +
+                '✓ Created: ' + response.createdCount + ' meeting' + (response.createdCount === 1 ? '' : 's') + '\n' +
+                '✓ Recurrence: Every ' + meta.recurrenceWeeks + ' week' + (meta.recurrenceWeeks === 1 ? '' : 's') + '\n' +
+                '✓ Slots per week: ' + meta.slotsPerWeek;
+
+              if (meta.deleteFailures > 0 || meta.createFailures > 0) {
+                summaryMsg += '\n\n⚠️ Warnings:\n';
+                if (meta.deleteFailures > 0) {
+                  summaryMsg += '• ' + meta.deleteFailures + ' deletion' + (meta.deleteFailures === 1 ? '' : 's') + ' failed\n';
+                }
+                if (meta.createFailures > 0) {
+                  summaryMsg += '• ' + meta.createFailures + ' creation' + (meta.createFailures === 1 ? '' : 's') + ' failed\n';
+                }
+              }
+
+              alert(summaryMsg);
+              showSuccess(response.message);
+
+              // Refresh meetings list and people list
+              loadMeetingsList();
+              var activeTab = getActiveTab();
+              if (activeTab === 'people') {
+                loadPeopleList();
+              }
+            } else {
+              console.error('Regeneration failed:', response.error, response.errorType);
+              var errorMsg = response.error || 'Failed to regenerate meetings';
+
+              // If some deletions succeeded, inform user
+              if (response.deletedCount && response.deletedCount > 0) {
+                errorMsg += '\n\n⚠️ ' + response.deletedCount + ' meeting' + (response.deletedCount === 1 ? ' was' : 's were') + ' deleted before the error occurred.';
+              }
+
+              showError(errorMsg);
+              loadMeetingsList(); // Refresh to show current state
+            }
+          })
+          .withFailureHandler(function(error) {
+            console.error('regenerateAllMeetings error:', error);
+            hideLoading();
+            showError('Failed to regenerate meetings: ' + error.message);
+          })
+          .regenerateAllMeetings();
       }
 
       // =========================================================================

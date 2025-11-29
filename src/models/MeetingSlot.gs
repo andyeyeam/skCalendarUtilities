@@ -112,6 +112,49 @@ function padZero(num) {
 }
 
 /**
+ * Normalize time value to HH:MM string format
+ * Handles both string and Date object inputs
+ * @param {string|Date} timeValue - Time value (HH:MM string or Date object)
+ * @returns {string} Time in HH:MM format
+ */
+function normalizeTimeValue(timeValue) {
+  if (!timeValue) {
+    return '';
+  }
+
+  // If already in HH:MM format, return as-is
+  if (typeof timeValue === 'string' && /^([01]\d|2[0-3]):([0-5]\d)$/.test(timeValue)) {
+    return timeValue;
+  }
+
+  // If it's a Date object, extract hours and minutes
+  if (timeValue instanceof Date) {
+    var hours = timeValue.getHours();
+    var minutes = timeValue.getMinutes();
+    return padZero(hours) + ':' + padZero(minutes);
+  }
+
+  // If it's a string that might be a date string, try to parse it
+  if (typeof timeValue === 'string') {
+    var date = new Date(timeValue);
+    if (!isNaN(date.getTime())) {
+      var hours = date.getHours();
+      var minutes = date.getMinutes();
+      return padZero(hours) + ':' + padZero(minutes);
+    }
+
+    // Try to extract HH:MM from string
+    var match = timeValue.match(/(\d{1,2}):(\d{2})/);
+    if (match) {
+      return padZero(parseInt(match[1], 10)) + ':' + match[2];
+    }
+  }
+
+  // Fallback: return as string
+  return String(timeValue);
+}
+
+/**
  * Convert slot object to sheet row
  * @param {Object} slot - MeetingSlot object
  * @returns {Array} Row values

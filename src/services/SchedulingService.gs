@@ -474,3 +474,309 @@ function viewMeetings() {
     };
   }
 }
+
+/**
+ * Delete a one-to-one meeting for a specific person
+ * Removes the calendar event and clears the calendarEventId from the person record
+ * @param {string} personId - Unique person identifier
+ * @returns {Object} {success: boolean, personId: string, eventDeleted: boolean, error: string}
+ */
+function deleteMeeting(personId) {
+  try {
+    log('deleteMeeting started', { personId: personId });
+
+    // Get person details
+    var spreadsheet = getOrCreateConfigSheet();
+    var peopleSheet = spreadsheet.getSheetByName('OneToOnePeople');
+
+    if (!peopleSheet) {
+      return {
+        success: false,
+        error: 'OneToOnePeople sheet not found',
+        errorType: 'system'
+      };
+    }
+
+    // Find person by personId
+    var allData = batchRead(peopleSheet);
+    var personRowIndex = -1;
+    var eventId = null;
+    var personName = '';
+
+    for (var i = 1; i < allData.length; i++) {
+      if (allData[i][0] === personId) {
+        personRowIndex = i + 1; // Convert to 1-indexed
+        personName = allData[i][1];
+        eventId = allData[i][3]; // Column 4 is calendarEventId
+        break;
+      }
+    }
+
+    if (personRowIndex === -1) {
+      return {
+        success: false,
+        error: 'Person not found',
+        errorType: 'validation'
+      };
+    }
+
+    // Check if person has a calendar event
+    if (!eventId || eventId.trim().length === 0) {
+      return {
+        success: true,
+        personId: personId,
+        eventDeleted: false,
+        message: personName + ' has no meeting to delete',
+        warning: 'No calendar event found for this person'
+      };
+    }
+
+    // Get calendar
+    var userConfig = getConfig();
+    if (!userConfig.selectedCalendarId) {
+      return {
+        success: false,
+        error: 'No calendar selected',
+        errorType: 'validation'
+      };
+    }
+
+    var calendar = CalendarApp.getCalendarById(userConfig.selectedCalendarId);
+    if (!calendar) {
+      return {
+        success: false,
+        error: 'Calendar not found',
+        errorType: 'system'
+      };
+    }
+
+    // Delete calendar event series
+    var eventDeleted = false;
+    try {
+      var eventSeries = calendar.getEventSeriesById(eventId);
+      if (eventSeries) {
+        eventSeries.deleteEventSeries();
+        eventDeleted = true;
+        log('Calendar event deleted', { eventId: eventId, personName: personName });
+      } else {
+        warn('Calendar event not found', { eventId: eventId });
+      }
+    } catch (calError) {
+      warn('Failed to delete calendar event', { eventId: eventId, error: calError.message });
+      // Continue to clear the calendarEventId even if calendar deletion fails
+    }
+
+    // Clear calendarEventId from person record
+    peopleSheet.getRange(personRowIndex, 4).setValue(''); // Column 4 is calendarEventId
+
+    log('deleteMeeting completed', { personId: personId, eventDeleted: eventDeleted });
+    return {
+      success: true,
+      personId: personId,
+      eventDeleted: eventDeleted,
+      message: 'Meeting deleted for ' + personName
+    };
+  } catch (e) {
+    error('deleteMeeting failed', e);
+    return {
+      success: false,
+      error: e.message || 'Failed to delete meeting',
+      errorType: 'system'
+    };
+  }
+}
+
+/**
+ * Regenerate all one-to-one meetings
+ * Deletes all existing meetings and creates new ones based on current configuration
+ * Used when configuration changes significantly (e.g., new people added, slots changed)
+ * @returns {Object} {success: boolean, deletedCount: number, createdCount: number, metadata: Object}
+ */
+function regenerateAllMeetings() {
+  try {
+    log('regenerateAllMeetings started');
+
+    // Get all people
+    var peopleResponse = listPeople();
+    if (!peopleResponse.success) {
+      return {
+        success: false,
+        error: 'Failed to load people',
+        errorType: 'system'
+      };
+    }
+
+    var people = peopleResponse.people;
+
+    // Get calendar
+    var userConfig = getConfig();
+    if (!userConfig.selectedCalendarId) {
+      return {
+        success: false,
+        error: 'No calendar selected',
+        errorType: 'validation'
+      };
+    }
+
+    var calendar = CalendarApp.getCalendarById(userConfig.selectedCalendarId);
+    if (!calendar) {
+      return {
+        success: false,
+        error: 'Calendar not found',
+        errorType: 'system'
+      };
+    }
+
+    // Step 1: Delete all existing meetings
+    var deletedCount = 0;
+    var deleteFailures = 0;
+
+    for (var i = 0; i < people.length; i++) {
+      var person = people[i];
+      if (person.calendarEventId && person.calendarEventId.trim().length > 0) {
+        try {
+          var eventSeries = calendar.getEventSeriesById(person.calendarEventId);
+          if (eventSeries) {
+            eventSeries.deleteEventSeries();
+            deletedCount++;
+            log('Deleted meeting for regeneration', { personId: person.personId, personName: person.name });
+          }
+        } catch (delError) {
+          warn('Failed to delete meeting during regeneration', { personId: person.personId, error: delError.message });
+          deleteFailures++;
+        }
+
+        // Clear calendarEventId from person record
+        var spreadsheet = getOrCreateConfigSheet();
+        var peopleSheet = spreadsheet.getSheetByName('OneToOnePeople');
+        var allData = batchRead(peopleSheet);
+
+        for (var j = 1; j < allData.length; j++) {
+          if (allData[j][0] === person.personId) {
+            var rowIndex = j + 1;
+            peopleSheet.getRange(rowIndex, 4).setValue(''); // Clear calendarEventId
+            break;
+          }
+        }
+      }
+    }
+
+    log('Deletion phase complete', { deletedCount: deletedCount, deleteFailures: deleteFailures });
+
+    // Step 2: Create new meetings using createAllMeetings logic
+    var configResponse = getOneToOneConfig();
+    if (!configResponse.success) {
+      return {
+        success: false,
+        error: 'Failed to load configuration after deletion',
+        errorType: 'system',
+        deletedCount: deletedCount
+      };
+    }
+
+    var config = configResponse.config;
+
+    // Get time slots
+    var slotsResponse = listMeetingSlots();
+    if (!slotsResponse.success || slotsResponse.count === 0) {
+      return {
+        success: false,
+        error: 'Cannot create meetings: no time slots configured',
+        errorType: 'validation',
+        deletedCount: deletedCount
+      };
+    }
+
+    var slots = slotsResponse.slots;
+
+    // Expand slots into periods
+    var periods = expandSlotsIntoPeriods(slots, config.meetingDurationMinutes);
+    var slotsPerWeek = periods.length;
+
+    if (slotsPerWeek === 0) {
+      return {
+        success: false,
+        error: 'Meeting duration exceeds all available time slots',
+        errorType: 'validation',
+        deletedCount: deletedCount
+      };
+    }
+
+    // Calculate recurrence interval
+    var recurrenceWeeks = calculateRecurrenceInterval(
+      people.length,
+      slotsPerWeek,
+      config.minRecurrenceIntervalWeeks
+    );
+
+    // Assign people to periods
+    var assignments = assignPeopleToPeriods(people, periods, recurrenceWeeks);
+
+    // Execute scheduling
+    var results = executeScheduling(
+      calendar,
+      assignments,
+      config.meetingDurationMinutes
+    );
+
+    // Update people sheet with new calendar event IDs
+    var spreadsheet = getOrCreateConfigSheet();
+    var peopleSheet = spreadsheet.getSheetByName('OneToOnePeople');
+
+    for (var i = 0; i < results.length; i++) {
+      var result = results[i];
+      if (result.success && result.eventId) {
+        var allData = batchRead(peopleSheet);
+        for (var j = 1; j < allData.length; j++) {
+          if (allData[j][0] === result.personId) {
+            var rowIndex = j + 1;
+            peopleSheet.getRange(rowIndex, 4).setValue(result.eventId);
+            break;
+          }
+        }
+      }
+    }
+
+    // Calculate success/failure counts
+    var createdCount = 0;
+    var createFailures = 0;
+
+    for (var i = 0; i < results.length; i++) {
+      if (results[i].success) {
+        createdCount++;
+      } else {
+        createFailures++;
+      }
+    }
+
+    var metadata = {
+      totalPeople: people.length,
+      deletedCount: deletedCount,
+      deleteFailures: deleteFailures,
+      createdCount: createdCount,
+      createFailures: createFailures,
+      recurrenceWeeks: recurrenceWeeks,
+      slotsPerWeek: slotsPerWeek
+    };
+
+    var message = 'Regenerated meetings: deleted ' + deletedCount + ', created ' + createdCount +
+      ' (recurrence: every ' + recurrenceWeeks + ' week' + (recurrenceWeeks === 1 ? '' : 's') + ')';
+
+    log('regenerateAllMeetings completed', metadata);
+
+    return {
+      success: true,
+      deletedCount: deletedCount,
+      createdCount: createdCount,
+      metadata: metadata,
+      message: message
+    };
+  } catch (e) {
+    error('regenerateAllMeetings failed', e);
+    return {
+      success: false,
+      error: e.message || 'Failed to regenerate meetings',
+      errorType: 'system'
+    };
+  }
+}

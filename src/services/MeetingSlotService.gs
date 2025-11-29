@@ -73,8 +73,8 @@ function addMeetingSlot(weekday, startTime) {
     var serializedSlot = {
       slotId: String(slot.slotId || ''),
       weekday: String(slot.weekday || ''),
-      startTime: String(slot.startTime || ''),
-      endTime: String(slot.endTime || ''),
+      startTime: normalizeTimeValue(slot.startTime),
+      endTime: normalizeTimeValue(slot.endTime),
       createdAt: String(slot.createdAt || '')
     };
 
@@ -190,8 +190,8 @@ function editMeetingSlot(slotId, weekday, startTime) {
     var serializedSlot = {
       slotId: String(updatedSlot.slotId || ''),
       weekday: String(updatedSlot.weekday || ''),
-      startTime: String(updatedSlot.startTime || ''),
-      endTime: String(updatedSlot.endTime || ''),
+      startTime: normalizeTimeValue(updatedSlot.startTime),
+      endTime: normalizeTimeValue(updatedSlot.endTime),
       createdAt: String(updatedSlot.createdAt || '')
     };
 
@@ -333,11 +333,12 @@ function listMeetingSlots() {
         var slot = rowToSlot(allData[i]);
 
         // Explicitly serialize to plain object (ensure JSON compatibility)
+        // Use normalizeTimeValue to convert Date objects to HH:MM format
         var serializedSlot = {
           slotId: String(slot.slotId || ''),
           weekday: String(slot.weekday || ''),
-          startTime: String(slot.startTime || ''),
-          endTime: String(slot.endTime || ''),
+          startTime: normalizeTimeValue(slot.startTime),
+          endTime: normalizeTimeValue(slot.endTime),
           createdAt: String(slot.createdAt || '')
         };
 
