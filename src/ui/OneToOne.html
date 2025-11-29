@@ -904,6 +904,37 @@
       }
 
       /**
+       * Format time value to HH:MM string
+       * @param {string|Date} timeValue - Time value (could be HH:MM string, Date object, or ISO string)
+       * @returns {string} Time in HH:MM format
+       */
+      function formatTimeOnly(timeValue) {
+        if (!timeValue) return '';
+
+        // If it's already in HH:MM format, return as-is
+        if (typeof timeValue === 'string' && /^([01]\d|2[0-3]):([0-5]\d)$/.test(timeValue)) {
+          return timeValue;
+        }
+
+        // If it's a Date object or ISO string, extract time
+        var date = typeof timeValue === 'string' ? new Date(timeValue) : timeValue;
+        if (date instanceof Date && !isNaN(date.getTime())) {
+          var hours = ('0' + date.getHours()).slice(-2);
+          var minutes = ('0' + date.getMinutes()).slice(-2);
+          return hours + ':' + minutes;
+        }
+
+        // Fallback: try to extract HH:MM from string
+        var match = String(timeValue).match(/(\d{1,2}):(\d{2})/);
+        if (match) {
+          var h = ('0' + match[1]).slice(-2);
+          return h + ':' + match[2];
+        }
+
+        return String(timeValue);
+      }
+
+      /**
        * Render the slots list (T031)
        * @param {Array<Object>} slots - Array of slot objects
        */
@@ -954,10 +985,13 @@
         for (var i = 0; i < slots.length; i++) {
           var slot = slots[i];
 
+          // Format times to HH:MM only
+          var startTime = formatTimeOnly(slot.startTime);
+          var endTime = formatTimeOnly(slot.endTime);
+
           html += '<div class="list-item" data-slot-id="' + escapeHtml(slot.slotId) + '">' +
             '<div class="list-item-info">' +
-              '<div class="list-item-name">' + escapeHtml(slot.weekday) + '</div>' +
-              '<div class="list-item-detail">' + escapeHtml(slot.startTime) + ' - ' + escapeHtml(slot.endTime) + '</div>' +
+              '<div class="list-item-name">' + escapeHtml(slot.weekday) + ' ' + escapeHtml(startTime) + ' - ' + escapeHtml(endTime) + '</div>' +
             '</div>' +
             '<div class="list-item-actions">' +
               '<button class="button-small button-edit" onclick="handleEditSlotClick(\'' + escapeHtml(slot.slotId) + '\')">Edit</button>' +
@@ -1022,12 +1056,13 @@
         var listItem = document.querySelector('[data-slot-id="' + slotId + '"]');
         if (!listItem) return;
 
-        var weekdayElement = listItem.querySelector('.list-item-name');
-        var timeElement = listItem.querySelector('.list-item-detail');
+        var nameElement = listItem.querySelector('.list-item-name');
+        var fullText = nameElement.textContent;
 
-        var currentWeekday = weekdayElement.textContent;
-        var timeParts = timeElement.textContent.split(' - ');
-        var currentStartTime = timeParts[0];
+        // Parse "Monday 09:00 - 09:30" format
+        var parts = fullText.split(' ');
+        var currentWeekday = parts[0];
+        var currentStartTime = parts[1];
 
         // Replace list item with edit form
         var weekdayOptions = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -1068,6 +1103,20 @@
           return;
         }
 
+        // Find the list item and show inline busy indicator
+        var listItem = document.querySelector('[data-slot-id="' + slotId + '"]');
+        if (listItem) {
+          // Disable the row and show busy state
+          listItem.style.opacity = '0.5';
+          listItem.style.pointerEvents = 'none';
+
+          // Replace action buttons with busy indicator
+          var actionsDiv = listItem.querySelector('.list-item-actions');
+          if (actionsDiv) {
+            actionsDiv.innerHTML = '<span style="color: #666; font-size: 0.875rem;">⏳ Saving...</span>';
+          }
+        }
+
         // Submit to server (endTime will be calculated on server)
         showLoading();
 
@@ -1079,12 +1128,24 @@
               showSuccess('Time slot updated successfully');
               loadSlotsList();
             } else {
+              // Restore the row on error
+              if (listItem) {
+                listItem.style.opacity = '1';
+                listItem.style.pointerEvents = 'auto';
+              }
               showError(response.error || 'Failed to update time slot');
+              loadSlotsList(); // Reload to restore buttons
             }
           })
           .withFailureHandler(function(error) {
             hideLoading();
+            // Restore the row on error
+            if (listItem) {
+              listItem.style.opacity = '1';
+              listItem.style.pointerEvents = 'auto';
+            }
             showError('Failed to update time slot: ' + error.message);
+            loadSlotsList(); // Reload to restore buttons
           })
           .editMeetingSlot(slotId, weekday, startTime);
       }
