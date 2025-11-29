@@ -1296,19 +1296,25 @@
        * Load and display meetings list
        */
       function loadMeetingsList() {
+        console.log('loadMeetingsList called');
         showLoading();
 
         google.script.run
           .withSuccessHandler(function(response) {
+            console.log('viewMeetings response:', response);
             hideLoading();
 
             if (response.success) {
+              console.log('Meetings count:', response.meetings ? response.meetings.length : 0);
+              console.log('Meetings data:', response.meetings);
               renderMeetingsList(response.meetings, response.metadata);
             } else {
+              console.error('viewMeetings failed:', response.error);
               showError(response.error || 'Failed to load meetings');
             }
           })
           .withFailureHandler(function(error) {
+            console.error('viewMeetings error:', error);
             hideLoading();
             showError('Failed to load meetings: ' + error.message);
           })

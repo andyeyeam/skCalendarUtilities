@@ -352,7 +352,7 @@ function createAllMeetings() {
         for (var j = 1; j < allData.length; j++) {
           if (allData[j][0] === result.personId) {
             var rowIndex = j + 1;
-            peopleSheet.getRange(rowIndex, 4).setValue(result.eventId); // Column 4 is calendarEventId
+            peopleSheet.getRange(rowIndex, 3).setValue(result.eventId); // Column 3 is calendarEventId (1-indexed)
             break;
           }
         }
@@ -434,8 +434,16 @@ function viewMeetings() {
     var meetings = [];
     var peopleWithMeetings = 0;
 
+    log('Processing people for meetings', { totalPeople: people.length });
+
     for (var i = 0; i < people.length; i++) {
       var person = people[i];
+      log('Checking person', {
+        personId: person.personId,
+        name: person.name,
+        calendarEventId: person.calendarEventId,
+        hasEventId: !!(person.calendarEventId && person.calendarEventId.trim().length > 0)
+      });
 
       if (person.calendarEventId && person.calendarEventId.trim().length > 0) {
         peopleWithMeetings++;
@@ -448,6 +456,7 @@ function viewMeetings() {
           eventId: person.calendarEventId,
           eventTitle: person.name + ' + Andy Cheetham + 1:1 meeting'
         });
+        log('Added meeting for person', { personName: person.name });
       }
     }
 
@@ -507,7 +516,7 @@ function deleteMeeting(personId) {
       if (allData[i][0] === personId) {
         personRowIndex = i + 1; // Convert to 1-indexed
         personName = allData[i][1];
-        eventId = allData[i][3]; // Column 4 is calendarEventId
+        eventId = allData[i][2]; // Column 3 is calendarEventId (array is 0-indexed)
         break;
       }
     }
@@ -567,7 +576,7 @@ function deleteMeeting(personId) {
     }
 
     // Clear calendarEventId from person record
-    peopleSheet.getRange(personRowIndex, 4).setValue(''); // Column 4 is calendarEventId
+    peopleSheet.getRange(personRowIndex, 3).setValue(''); // Column 3 is calendarEventId (1-indexed)
 
     log('deleteMeeting completed', { personId: personId, eventDeleted: eventDeleted });
     return {
@@ -654,7 +663,7 @@ function regenerateAllMeetings() {
         for (var j = 1; j < allData.length; j++) {
           if (allData[j][0] === person.personId) {
             var rowIndex = j + 1;
-            peopleSheet.getRange(rowIndex, 4).setValue(''); // Clear calendarEventId
+            peopleSheet.getRange(rowIndex, 3).setValue(''); // Clear calendarEventId (column 3, 1-indexed)
             break;
           }
         }
@@ -730,7 +739,7 @@ function regenerateAllMeetings() {
         for (var j = 1; j < allData.length; j++) {
           if (allData[j][0] === result.personId) {
             var rowIndex = j + 1;
-            peopleSheet.getRange(rowIndex, 4).setValue(result.eventId);
+            peopleSheet.getRange(rowIndex, 3).setValue(result.eventId); // Column 3 is calendarEventId (1-indexed)
             break;
           }
         }
