@@ -113,19 +113,19 @@
 
 **Purpose**: Validation, testing, and finalization
 
-- [ ] T009 Manual Test 3 (Regeneration): Verify regenerate all meetings works with new algorithm
+- [ ] T009 Manual Test 3 (Regeneration): ⚠️ REQUIRES MANUAL TESTING - Verify regenerate all meetings works with new algorithm
   - Start with 4 people from Manual Test 1
   - Add 2 more people (total 6)
   - Click "Regenerate All Meetings"
   - Verify old meetings deleted and 6 new meetings created with correct distribution
 
-- [ ] T010 Manual Test 4 (Non-Integer Spacing): Test edge case handling
+- [ ] T010 Manual Test 4 (Non-Integer Spacing): ⚠️ REQUIRES MANUAL TESTING - Test edge case handling
   - Configure 7 people, 2 weekly slots, min recurrence 3
   - Verify recurrence interval = 4 weeks
   - Verify spacing = floor(4/2) = 2
   - Verify distribution: 2 meetings in weeks 0, 2, 4, and 1 meeting in week 6
 
-- [ ] T011 Regression Testing: Verify all existing Feature 006 functionality still works
+- [ ] T011 Regression Testing: ⚠️ REQUIRES MANUAL TESTING - Verify all existing Feature 006 functionality still works
   - Create new meetings (first time) works
   - View meetings shows correct list
   - Delete individual meeting works
@@ -133,19 +133,19 @@
   - Meeting duration settings respected
   - Minimum recurrence interval settings respected
 
-- [ ] T012 Edge Case Validation: Test boundary conditions
+- [ ] T012 Edge Case Validation: ⚠️ REQUIRES MANUAL TESTING - Test boundary conditions
   - Minimum recurrence = 1 week (same-week recurrence)
   - Very long recurrence (100 people with 1 slot → 100-week interval)
   - Empty people list → verify appropriate error message
   - Empty slots list → verify appropriate error message
 
-- [ ] T013 Performance Validation: Verify meeting generation completes within 5 seconds for up to 100 people
+- [ ] T013 Performance Validation: ⚠️ REQUIRES MANUAL TESTING - Verify meeting generation completes within 5 seconds for up to 100 people
 
-- [ ] T014 Deploy to Google Apps Script using clasp push or web editor
+- [X] T014 Deploy to Google Apps Script using clasp push or web editor
 
-- [ ] T015 Update CLAUDE.md with Feature 007 implementation status and recent changes
+- [X] T015 Update CLAUDE.md with Feature 007 implementation status and recent changes
 
-- [ ] T016 Create git commit with descriptive message documenting the interval stride distribution enhancement
+- [X] T016 Create git commit with descriptive message documenting the interval stride distribution enhancement
 
 ---
 

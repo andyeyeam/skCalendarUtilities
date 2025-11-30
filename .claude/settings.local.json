@@ -26,7 +26,15 @@
       "Bash(then echo \"ui exists\")",
       "Bash(else echo \"ui missing\")",
       "Bash(clasp logout:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nImplement one-to-one meeting scheduler feature\n\n- Add people management with full name capture (no email required)\n- Implement meeting slot configuration with automatic end time calculation\n- Create hardcoded event title format: [Name] + Andy Cheetham + 1:1 meeting\n- Add meeting scheduling with optimal recurrence intervals\n- Implement UI with tabs for People, Settings, and Meetings\n- Add inline busy indicators for delete operations with smooth animations\n- Fix infinite loop in sheet initialization\n- Add explicit JSON serialization for client-server communication\n- Remove email field from person model as guests added manually\n- Remove meeting title prefix setting (title format is hardcoded)\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(git checkout:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(for dir in specs/*/)",
+      "Bash(if [ -f \"$dir/spec.md\" ])",
+      "Bash(then head -20 \"$dir/spec.md\")",
+      "Bash(done)"
     ],
     "deny": [],
     "ask": []
