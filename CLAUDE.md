@@ -11,6 +11,8 @@ Auto-generated from all feature plans. Last updated: 2025-01-12
 - Google Sheets for configuration (existing "Calendar Utilities Config" spreadsheet), Session Storage for UI state persistence (005-add-a-new)
 - Google Apps Script (JavaScript ES5+ compatible, V8 runtime) + Google Calendar API (CalendarApp), Google Sheets API (SpreadsheetApp), HTML Service for UI, Session Storage for UI state (006-i-would-like)
 - Google Sheets (existing "Calendar Utilities Config" spreadsheet with 3 new tabs: OneToOnePeople, OneToOneConfig, OneToOneSlots) (006-i-would-like)
+- JavaScript ES5+ (Google Apps Script V8 runtime) + Google Apps Script APIs (CalendarApp, SpreadsheetApp, HTML Service) (007-when-scheduling-meetings)
+- Google Sheets (existing "Calendar Utilities Config" spreadsheet with OneToOnePeople, OneToOneConfig, OneToOneSlots tabs) (007-when-scheduling-meetings)
 
 ## Project Structure
 ```
@@ -67,6 +69,12 @@ No build system - Google Apps Script deployed via clasp CLI
 - Comments: JSDoc style for functions
 
 ## Recent Changes
+- 007-when-scheduling-meetings: IMPLEMENTED - Optimized meeting slot distribution with interval stride algorithm for conflict prevention, smart recurrence calculation, and even distribution across weeks (2025-01-30)
+  - Modified service: SchedulingService.gs (3 functions)
+  - Algorithm change: Replaced round-robin with interval stride distribution
+  - New field: weekOffset in assignment objects for even calendar distribution
+  - Formula: spacing = floor(recurrence_interval / weekly_slots)
+  - Zero conflicts guaranteed, meetings spread evenly across recurrence cycle
 - 006-i-would-like: IMPLEMENTED - One-to-one meeting scheduler with automated recurring event creation, intelligent interval calculation, people/slot management, meeting deletion, and regeneration capabilities (2025-01-29)
   - New models: Person, MeetingSlot, ScheduledMeeting
   - New services: PeopleService, MeetingSlotService, OneToOneConfigService, SchedulingService
@@ -75,7 +83,6 @@ No build system - Google Apps Script deployed via clasp CLI
   - Google Sheets tabs: OneToOnePeople, OneToOneConfig, OneToOneSlots
   - Bug fix: Time parsing for Date objects from Google Sheets (normalizeTimeValue function)
 - 005-add-a-new: IMPLEMENTED - Contiguous availability blocks feature with mode selection UI, dual search modes (duration-based and contiguous), mode persistence, and comparison UX enhancements (2025-01-19)
-- 004-i-would-like: IMPLEMENTED - Calendar event display feature with event fetching, compact UI rendering, graceful degradation, and multi-day event detection (2025-01-13)
 
 <!-- MANUAL ADDITIONS START -->
 <!-- MANUAL ADDITIONS END -->

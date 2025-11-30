@@ -60,30 +60,38 @@ function expandSlotsIntoPeriods(slots, durationMinutes) {
 }
 
 /**
- * Assign people to meeting periods using round-robin distribution
+ * Assign people to meeting periods using interval stride distribution
+ * Ensures even spacing across recurrence cycle and prevents slot conflicts within same week
  * @param {Array<Object>} people - Array of Person objects
  * @param {Array<Object>} periods - Array of period objects
  * @param {number} recurrenceWeeks - Recurrence interval in weeks
- * @returns {Array<Object>} Array of assignments {person, period}
+ * @returns {Array<Object>} Array of assignments {person, period, weekOffset}
  */
 function assignPeopleToPeriods(people, periods, recurrenceWeeks) {
   var assignments = [];
-  var periodIndex = 0;
+  var slotsPerWeek = periods.length;
+
+  // Calculate spacing between week offsets
+  var spacing = Math.floor(recurrenceWeeks / slotsPerWeek);
 
   for (var i = 0; i < people.length; i++) {
     var person = people[i];
-    var period = periods[periodIndex];
+
+    // Calculate week offset for even distribution
+    var weekOffset = Math.floor(i / slotsPerWeek) * spacing;
+
+    // Assign to slot within the week
+    var slotIndex = i % slotsPerWeek;
+    var period = periods[slotIndex];
 
     assignments.push({
       person: person,
       weekday: period.weekday,
       startTime: period.startTime,
       endTime: period.endTime,
+      weekOffset: weekOffset,          // NEW: Week offset within recurrence cycle
       recurrenceWeeks: recurrenceWeeks
     });
-
-    // Move to next period (round-robin)
-    periodIndex = (periodIndex + 1) % periods.length;
   }
 
   return assignments;
@@ -133,13 +141,14 @@ function createOneToOneMeeting(calendar, personName, weekday, startDateTime, end
 }
 
 /**
- * Calculate next occurrence date for a given weekday
+ * Calculate next occurrence date for a given weekday with week offset
  * @param {string} weekday - Day of week (Monday, Tuesday, etc.)
  * @param {number} startTimeMinutes - Start time in minutes since midnight
  * @param {number} durationMinutes - Meeting duration in minutes
+ * @param {number} weekOffset - Number of weeks to offset the start date
  * @returns {Object} {startDateTime: Date, endDateTime: Date}
  */
-function calculateNextOccurrence(weekday, startTimeMinutes, durationMinutes) {
+function calculateNextOccurrence(weekday, startTimeMinutes, durationMinutes, weekOffset) {
   var weekdayMap = {
     'Sunday': 0,
     'Monday': 1,
@@ -163,6 +172,10 @@ function calculateNextOccurrence(weekday, startTimeMinutes, durationMinutes) {
   // Create start date/time
   var startDate = new Date(today);
   startDate.setDate(today.getDate() + daysUntil);
+
+  // NEW: Apply week offset
+  startDate.setDate(startDate.getDate() + (weekOffset * 7));
+
   startDate.setHours(Math.floor(startTimeMinutes / 60));
   startDate.setMinutes(startTimeMinutes % 60);
   startDate.setSeconds(0);
@@ -195,7 +208,7 @@ function executeScheduling(calendar, assignments, durationMinutes) {
     try {
       // Calculate next occurrence date/time
       var startTimeMinutes = parseTime(assignment.startTime);
-      var occurrence = calculateNextOccurrence(assignment.weekday, startTimeMinutes, durationMinutes);
+      var occurrence = calculateNextOccurrence(assignment.weekday, startTimeMinutes, durationMinutes, assignment.weekOffset);
 
       // Create recurring event
       var eventId = createOneToOneMeeting(
