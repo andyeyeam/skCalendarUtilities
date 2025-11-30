@@ -59,7 +59,7 @@ These cannot be meaningfully separated - the UI handler (US2+US3) calls the serv
 
 **Server-Side Implementation (User Story 1 - Bulk Deletion)**
 
-- [ ] T006 [US1] Add `clearAllPeople()` function to `src/services/PeopleService.gs`:
+- [X] T006 [US1] Add `clearAllPeople()` function to `src/services/PeopleService.gs`:
   - Add function after existing `listPeople()` function
   - Implement logic per quickstart.md Step 1 (130 lines)
   - Use `listPeople()` to get all people
@@ -73,13 +73,13 @@ These cannot be meaningfully separated - the UI handler (US2+US3) calls the serv
 
 **UI Implementation (User Stories 2 & 3 - Feedback & Confirmation)**
 
-- [ ] T007 [US2+US3] Add "Clear All" button to `src/ui/OneToOne.html`:
+- [X] T007 [US2+US3] Add "Clear All" button to `src/ui/OneToOne.html`:
   - Add button in People tab before "Add Person Form" (per quickstart.md Step 2)
   - Use existing neutral button styling (background: #f5f5f5, color: #333, border: #ddd)
   - Add onclick handler: `onclick="handleClearAllClick()"`
   - Button text: "Clear All People & Meetings"
 
-- [ ] T008 [US2+US3] Add `handleClearAllClick()` function to `src/ui/OneToOne.html`:
+- [X] T008 [US2+US3] Add `handleClearAllClick()` function to `src/ui/OneToOne.html`:
   - Add function in `<script>` section after existing delete handlers (per quickstart.md Step 3)
   - **US3 - Confirmation**: Show confirmation dialog with:
     - Strong warning: "⚠️ CLEAR ALL PEOPLE AND MEETINGS?"

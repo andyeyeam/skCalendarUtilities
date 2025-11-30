@@ -71,7 +71,12 @@ No build system - Google Apps Script deployed via clasp CLI
 - Comments: JSDoc style for functions
 
 ## Recent Changes
-- 008-clear-all-add: Added JavaScript ES5+ compatible (Google Apps Script V8 runtime) + Google Apps Script services (CalendarApp, SpreadsheetApp), HTML Service for UI
+- 008-clear-all-add: IMPLEMENTED - Clear All feature for bulk deletion of all people and meetings with confirmation dialog, working indicator, and settings preservation (2025-01-30)
+  - Modified service: PeopleService.gs (added clearAllPeople() function)
+  - Modified UI: OneToOne.html (added Clear All button and handler)
+  - Features: Batch deletion, confirmation dialog with warnings, working indicator during operation, partial failure handling
+  - Settings preservation: OneToOneConfig and OneToOneSlots never modified
+  - Performance: Supports up to 100 people deletion within 10 seconds
 - 007-when-scheduling-meetings: IMPLEMENTED - Optimized meeting slot distribution with interval stride algorithm for conflict prevention, smart recurrence calculation, and even distribution across weeks (2025-01-30)
   - Modified service: SchedulingService.gs (3 functions)
   - Algorithm change: Replaced round-robin with interval stride distribution

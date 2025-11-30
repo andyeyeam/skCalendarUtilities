@@ -289,3 +289,145 @@ function listPeople() {
     };
   }
 }
+
+/**
+ * Clear all people from the one-to-one group
+ * Deletes all people and their associated calendar events in a single batch operation
+ * Preserves configuration settings (OneToOneConfig and OneToOneSlots)
+ * @returns {Object} {success: boolean, deletedPeople: number, deletedEvents: number, failedEvents: number, failedPeople: Array, message: string}
+ */
+function clearAllPeople() {
+  try {
+    log('clearAllPeople started');
+
+    // Get all people
+    var peopleResponse = listPeople();
+    if (!peopleResponse.success) {
+      return {
+        success: false,
+        deletedPeople: 0,
+        deletedEvents: 0,
+        failedEvents: 0,
+        failedPeople: [],
+        error: 'Failed to load people',
+        errorType: 'system'
+      };
+    }
+
+    var people = peopleResponse.people;
+
+    // Handle empty state
+    if (people.length === 0) {
+      log('clearAllPeople: no people to delete');
+      return {
+        success: true,
+        deletedPeople: 0,
+        deletedEvents: 0,
+        failedEvents: 0,
+        failedPeople: [],
+        message: 'No people to delete - the group is already empty'
+      };
+    }
+
+    log('clearAllPeople: deleting ' + people.length + ' people');
+
+    // Initialize counters
+    var deletedPeople = 0;
+    var deletedEvents = 0;
+    var failedEvents = 0;
+    var failedPeople = [];
+
+    // Get calendar configuration
+    var config = getConfig();
+    var calendar = null;
+    if (config.selectedCalendarId) {
+      calendar = CalendarApp.getCalendarById(config.selectedCalendarId);
+    }
+
+    // Get spreadsheet and people sheet for deletion
+    var spreadsheet = getOrCreateConfigSheet();
+    var peopleSheet = spreadsheet.getSheetByName('OneToOnePeople');
+
+    if (!peopleSheet) {
+      return {
+        success: false,
+        deletedPeople: 0,
+        deletedEvents: 0,
+        failedEvents: 0,
+        failedPeople: [],
+        error: 'OneToOnePeople sheet not found',
+        errorType: 'system'
+      };
+    }
+
+    // Iterate through people in reverse order (to avoid row index shifting issues)
+    var allData = batchRead(peopleSheet);
+    for (var i = allData.length - 1; i >= 1; i--) {
+      var person = rowToPerson(allData[i]);
+
+      // Attempt calendar event deletion if exists
+      if (person.calendarEventId && person.calendarEventId.trim().length > 0 && calendar) {
+        try {
+          var eventSeries = calendar.getEventSeriesById(person.calendarEventId);
+          if (eventSeries) {
+            eventSeries.deleteEventSeries();
+            deletedEvents++;
+            log('Deleted calendar event for person', { personId: person.personId, personName: person.name });
+          }
+        } catch (calError) {
+          failedEvents++;
+          failedPeople.push({
+            personId: person.personId,
+            personName: person.name,
+            calendarEventId: person.calendarEventId,
+            error: calError.message
+          });
+          warn('Failed to delete calendar event during clear all', { personId: person.personId, error: calError.message });
+        }
+      }
+
+      // Delete person row from sheet (i+1 because sheet rows are 1-indexed)
+      var rowIndex = i + 1;
+      peopleSheet.deleteRow(rowIndex);
+      deletedPeople++;
+    }
+
+    // Construct success message
+    var message;
+    if (failedEvents === 0) {
+      message = 'Cleared all people and meetings: deleted ' + deletedPeople + ' people and ' +
+                deletedEvents + ' recurring meetings';
+    } else {
+      message = 'Cleared all people: deleted ' + deletedPeople + ' people, ' +
+                deletedEvents + ' meetings deleted successfully, ' +
+                failedEvents + ' meeting deletions failed';
+    }
+
+    log('clearAllPeople completed', {
+      deletedPeople: deletedPeople,
+      deletedEvents: deletedEvents,
+      failedEvents: failedEvents
+    });
+
+    return {
+      success: true,
+      deletedPeople: deletedPeople,
+      deletedEvents: deletedEvents,
+      failedEvents: failedEvents,
+      failedPeople: failedPeople,
+      message: message
+    };
+
+  } catch (e) {
+    error('clearAllPeople failed', e);
+    return {
+      success: false,
+      deletedPeople: 0,
+      deletedEvents: 0,
+      failedEvents: 0,
+      failedPeople: [],
+      error: e.message || 'Failed to clear all people',
+      errorType: 'system'
+    };
+  }
+}

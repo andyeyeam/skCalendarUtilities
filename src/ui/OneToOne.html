@@ -211,6 +211,17 @@
         <div class="card">
           <h2>People in One-to-One Group</h2>
 
+          <!-- Clear All Button -->
+          <div class="form-actions mb-3" style="justify-content: flex-start;">
+            <button
+              type="button"
+              class="button"
+              onclick="handleClearAllClick()"
+              style="background-color: #f5f5f5; color: #333; border: 1px solid #ddd;">
+              Clear All People & Meetings
+            </button>
+          </div>
+
           <!-- Add Person Form -->
           <form id="addPersonForm" onsubmit="handleAddPerson(event)">
             <div class="form-group">
@@ -763,6 +774,86 @@
             loadPeopleList(); // Reload to restore buttons
           })
           .deletePerson(personId);
+      }
+
+      /**
+       * Handle clear all people button click
+       */
+      function handleClearAllClick() {
+        console.log('handleClearAllClick called');
+
+        // Confirmation dialog with strong warning (User Story 3)
+        if (!confirm('⚠️ CLEAR ALL PEOPLE AND MEETINGS?\n\n' +
+                     'This will PERMANENTLY DELETE:\n' +
+                     '• ALL people in your one-to-one group\n' +
+                     '• ALL recurring calendar events\n\n' +
+                     'Your settings will be preserved:\n' +
+                     '✓ Meeting duration and recurrence interval\n' +
+                     '✓ Time slot configurations\n\n' +
+                     'THIS ACTION CANNOT BE UNDONE.\n\n' +
+                     'Continue?')) {
+          console.log('User cancelled clear all');
+          return;
+        }
+
+        console.log('Starting clear all operation...');
+
+        // Show working indicator (User Story 2)
+        showLoading();
+        showSuccess('⏳ Clearing all people and meetings... This may take a moment.');
+
+        google.script.run
+          .withSuccessHandler(function(response) {
+            console.log('clearAllPeople response:', response);
+            hideLoading();
+
+            if (!response) {
+              console.error('Null response from clearAllPeople');
+              showError('No response from server. Check browser console for details.');
+              return;
+            }
+
+            if (response.success) {
+              // Display success message
+              if (response.deletedPeople === 0) {
+                showSuccess(response.message);
+              } else if (response.failedEvents > 0) {
+                // Partial success - show warning
+                showSuccess(response.message);
+
+                // Display failed calendar deletions details
+                if (response.failedPeople && response.failedPeople.length > 0) {
+                  var failureDetails = '\n\nCalendar deletion failures:\n';
+                  for (var i = 0; i < response.failedPeople.length; i++) {
+                    failureDetails += '• ' + response.failedPeople[i].personName + ': ' +
+                                      response.failedPeople[i].error + '\n';
+                  }
+                  console.warn('Calendar deletion failures:', response.failedPeople);
+                }
+              } else {
+                // Complete success
+                showSuccess(response.message);
+              }
+
+              // Refresh people list to show empty state
+              loadPeopleList();
+
+              // Also refresh meetings list if user is on that tab
+              var activeTab = getActiveTab();
+              if (activeTab === 'meetings') {
+                loadMeetingsList();
+              }
+            } else {
+              console.error('clearAllPeople failed:', response.error, response.errorType);
+              showError(response.error || 'Failed to clear all people');
+            }
+          })
+          .withFailureHandler(function(error) {
+            console.error('clearAllPeople error:', error);
+            hideLoading();
+            showError('Failed to clear all people: ' + error.message);
+          })
+          .clearAllPeople();
       }
 
       /**
