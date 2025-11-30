@@ -187,14 +187,14 @@ These cannot be meaningfully separated - the UI handler (US2+US3) calls the serv
   - Test large dataset (50+ people) - verify completion within 10 seconds
   - Verify no console errors in browser or Apps Script logs
 
-- [ ] T017 Deploy to Google Apps Script using clasp push or web editor
+- [X] T017 Deploy to Google Apps Script using clasp push or web editor
 
-- [ ] T018 Update CLAUDE.md with Feature 008 implementation status and recent changes:
+- [X] T018 Update CLAUDE.md with Feature 008 implementation status and recent changes:
   - Add to Recent Changes section
   - Document new clearAllPeople() function in PeopleService
   - Note UI enhancement in OneToOne.html (Clear All button)
 
-- [ ] T019 Create git commit with descriptive message documenting the Clear All feature
+- [X] T019 Create git commit with descriptive message documenting the Clear All feature
 
 ---
 
