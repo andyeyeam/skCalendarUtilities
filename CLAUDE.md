@@ -13,6 +13,8 @@ Auto-generated from all feature plans. Last updated: 2025-01-12
 - Google Sheets (existing "Calendar Utilities Config" spreadsheet with 3 new tabs: OneToOnePeople, OneToOneConfig, OneToOneSlots) (006-i-would-like)
 - JavaScript ES5+ (Google Apps Script V8 runtime) + Google Apps Script APIs (CalendarApp, SpreadsheetApp, HTML Service) (007-when-scheduling-meetings)
 - Google Sheets (existing "Calendar Utilities Config" spreadsheet with OneToOnePeople, OneToOneConfig, OneToOneSlots tabs) (007-when-scheduling-meetings)
+- JavaScript ES5+ compatible (Google Apps Script V8 runtime) + Google Apps Script services (CalendarApp, SpreadsheetApp), HTML Service for UI (008-clear-all-add)
+- Google Sheets (existing "Calendar Utilities Config" spreadsheet, OneToOnePeople tab) (008-clear-all-add)
 
 ## Project Structure
 ```
@@ -69,6 +71,7 @@ No build system - Google Apps Script deployed via clasp CLI
 - Comments: JSDoc style for functions
 
 ## Recent Changes
+- 008-clear-all-add: Added JavaScript ES5+ compatible (Google Apps Script V8 runtime) + Google Apps Script services (CalendarApp, SpreadsheetApp), HTML Service for UI
 - 007-when-scheduling-meetings: IMPLEMENTED - Optimized meeting slot distribution with interval stride algorithm for conflict prevention, smart recurrence calculation, and even distribution across weeks (2025-01-30)
   - Modified service: SchedulingService.gs (3 functions)
   - Algorithm change: Replaced round-robin with interval stride distribution
@@ -82,7 +85,6 @@ No build system - Google Apps Script deployed via clasp CLI
   - New utils: ValidationUtils for input validation
   - Google Sheets tabs: OneToOnePeople, OneToOneConfig, OneToOneSlots
   - Bug fix: Time parsing for Date objects from Google Sheets (normalizeTimeValue function)
-- 005-add-a-new: IMPLEMENTED - Contiguous availability blocks feature with mode selection UI, dual search modes (duration-based and contiguous), mode persistence, and comparison UX enhancements (2025-01-19)
 
 <!-- MANUAL ADDITIONS START -->
 <!-- MANUAL ADDITIONS END -->
