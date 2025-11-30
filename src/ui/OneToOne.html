@@ -1405,7 +1405,10 @@
         }
 
         console.log('Starting meeting creation...');
+
+        // Show working indicator
         showLoading();
+        showSuccess('⏳ Creating meetings... This may take a moment.');
 
         // Display calculated recurrence info (T053) will be shown in results
         google.script.run
@@ -1569,7 +1572,10 @@
         }
 
         console.log('Starting meeting regeneration...');
+
+        // Show working indicator
         showLoading();
+        showSuccess('⏳ Regenerating meetings... This may take a moment.');
 
         google.script.run
           .withSuccessHandler(function(response) {
