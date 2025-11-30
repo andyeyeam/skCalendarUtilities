@@ -109,8 +109,8 @@ function assignPeopleToPeriods(people, periods, recurrenceWeeks) {
  */
 function createOneToOneMeeting(calendar, personName, weekday, startDateTime, endDateTime, intervalWeeks) {
   try {
-    // Create event title in format: <Full Name> + "Andy Cheetham" + "1:1 meeting"
-    var title = personName + ' + Andy Cheetham + 1:1 meeting';
+    // Create event title in format: <Name> + Andy + "1:1"
+    var title = personName + ' + Andy + 1:1';
 
     // Create recurrence rule (repeats indefinitely)
     var recurrence = CalendarApp.newRecurrence()
@@ -124,6 +124,9 @@ function createOneToOneMeeting(calendar, personName, weekday, startDateTime, end
       endDateTime,
       recurrence
     );
+
+    // Set event description
+    eventSeries.setDescription('This event was created by the 1:1 manager');
 
     log('Created recurring event series', {
       title: title,
@@ -467,7 +470,7 @@ function viewMeetings() {
           personId: person.personId,
           personName: person.name,
           eventId: person.calendarEventId,
-          eventTitle: person.name + ' + Andy Cheetham + 1:1 meeting'
+          eventTitle: person.name + ' + Andy + 1:1'
         });
         log('Added meeting for person', { personName: person.name });
       }
