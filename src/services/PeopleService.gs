@@ -37,6 +37,20 @@ function addPerson(name) {
       };
     }
 
+    // Check for duplicates
+    var existingPeopleResponse = listPeople();
+    if (existingPeopleResponse.success && existingPeopleResponse.people.length > 0) {
+      for (var i = 0; i < existingPeopleResponse.people.length; i++) {
+        if (existingPeopleResponse.people[i].name.toLowerCase() === name.toLowerCase()) {
+           return {
+            success: false,
+            error: 'Person with name "' + name + '" already exists',
+            errorType: 'validation'
+          };
+        }
+      }
+    }
+
     // Create person object
     var person = createPerson(null, name);
 
@@ -54,6 +68,123 @@ function addPerson(name) {
     return {
       success: false,
       error: e.message || 'Failed to add person',
+      errorType: 'system'
+    };
+  }
+}
+
+/**
+ * Add multiple people to the one-to-one group (Batch Operation)
+ * @param {Array<string>} names - Array of names to add
+ * @returns {Object} {success: boolean, count: number, addedPeople: Array<Object>, error: string}
+ */
+function addPeople(names) {
+  try {
+    log('addPeople started', { count: names ? names.length : 0 });
+
+    if (!names || !Array.isArray(names) || names.length === 0) {
+      return {
+        success: false,
+        error: 'No names provided',
+        errorType: 'validation'
+      };
+    }
+
+    // Get spreadsheet and people sheet
+    var spreadsheet = getOrCreateConfigSheet();
+    var peopleSheet = spreadsheet.getSheetByName('OneToOnePeople');
+
+    if (!peopleSheet) {
+      return {
+        success: false,
+        error: 'OneToOnePeople sheet not found',
+        errorType: 'system'
+      };
+    }
+
+    var addedPeople = [];
+    var newRows = [];
+    var errors = [];
+
+    // Get existing people to check for duplicates
+    var existingPeopleResponse = listPeople();
+    var existingNames = new Set(); // Use Set for faster lookup if environment supports it, else array
+    
+    // Polyfill Set if needed or just use object map for safety in Apps Script ES5
+    var existingNameMap = {};
+    
+    if (existingPeopleResponse.success && existingPeopleResponse.people) {
+      for (var j = 0; j < existingPeopleResponse.people.length; j++) {
+        var existingName = existingPeopleResponse.people[j].name.toLowerCase();
+        existingNameMap[existingName] = true;
+      }
+    }
+
+    // Process each name
+    for (var i = 0; i < names.length; i++) {
+      var name = names[i] ? names[i].toString().trim() : '';
+      
+      if (!name) continue; // Skip empty names
+      
+      // Basic validation (length check)
+      if (name.length > 100) {
+        errors.push('Skipped "' + name + '": Name too long (>100 chars)');
+        continue;
+      }
+
+      // Check for duplicate (case-insensitive)
+      var nameLower = name.toLowerCase();
+      if (existingNameMap[nameLower]) {
+        errors.push('Skipped "' + name + '": Name already exists');
+        continue;
+      }
+      
+      // Add to map to prevent duplicates within the same batch
+      existingNameMap[nameLower] = true;
+
+      // Create person object
+      var person = createPerson(null, name);
+      addedPeople.push(person);
+      
+      // Convert to row
+      newRows.push(personToRow(person));
+    }
+
+    if (newRows.length === 0) {
+      return {
+        success: false,
+        error: 'No valid names to add',
+        errorType: 'validation'
+      };
+    }
+
+    // Batch write to sheet
+    // We can use the batchWrite helper if it supports append, or just standard range setValues
+    // standard setValues is safest for append if we calculate last row
+    
+    var lastRow = peopleSheet.getLastRow();
+    peopleSheet.getRange(lastRow + 1, 1, newRows.length, newRows[0].length).setValues(newRows);
+
+    log('addPeople completed', { addedCount: newRows.length });
+    
+    var result = {
+      success: true,
+      count: newRows.length,
+      addedPeople: addedPeople
+    };
+    
+    if (errors.length > 0) {
+      result.warning = 'Added ' + newRows.length + ' people. ' + errors.length + ' skipped.';
+      result.errors = errors;
+    }
+    
+    return result;
+
+  } catch (e) {
+    error('addPeople failed', e);
+    return {
+      success: false,
+      error: e.message || 'Failed to add people',
       errorType: 'system'
     };
   }
