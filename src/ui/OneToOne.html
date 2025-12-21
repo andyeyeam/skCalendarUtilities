@@ -602,7 +602,8 @@
         event.preventDefault();
 
         var form = document.getElementById('addPersonForm');
-        var name = document.getElementById('personName').value.trim();
+        var nameInput = document.getElementById('personName');
+        var name = nameInput.value.trim();
 
         // Client-side validation (T017)
         var errors = [];
@@ -618,24 +619,100 @@
           return;
         }
 
-        // Submit to server
-        showLoading();
+        // OPTIMISTIC UI UPDATE: Add person to list immediately
+        var tempId = 'temp-' + Date.now();
+        var tempPerson = {
+          personId: tempId,
+          name: name,
+          calendarEventId: null
+        };
+        
+        // Add to list UI immediately (Optimistic)
+        var listContainer = document.getElementById('peopleList');
+        var emptyState = listContainer.querySelector('.empty-state');
+        if (emptyState) {
+          listContainer.innerHTML = '';
+        }
+        
+        var tempHtml = '<div class="list-item optimistic-item" id="list-item-' + tempId + '" data-person-id="' + tempId + '" style="opacity: 0.6;">' +
+            '<div class="list-item-info">' +
+              '<div class="list-item-name">' + escapeHtml(name) + '</div>' +
+              '<div class="list-item-detail" style="color: #666;"><span class="spinner-small">⏳</span> Saving...</div>' +
+            '</div>' +
+            '<div class="list-item-actions">' +
+              // No actions while saving
+            '</div>' +
+          '</div>';
+          
+        var tempDiv = document.createElement('div');
+        tempDiv.innerHTML = tempHtml;
+        var newItem = tempDiv.firstChild;
+        listContainer.appendChild(newItem);
+        
+        // Clear form immediately
+        form.reset();
+        // Keep focus on input for rapid entry
+        // nameInput.focus(); // Optional: might be annoying if they want to click away
 
+        // Submit to server
+        // Note: We don't show global loading spinner anymore for this action
+        
         google.script.run
           .withSuccessHandler(function(response) {
-            hideLoading();
-
+            // Remove optimistic item and reload real list (or update it in place)
+            // Reloading is safer to ensure state consistency (ids, etc)
+            
             if (response.success) {
               showSuccess('Person added successfully');
-              form.reset();
-              loadPeopleList();
+              
+              // Find the optimistic item
+              var item = document.getElementById('list-item-' + tempId);
+              if (item) {
+                // Update in place to avoid full reload flicker
+                item.style.opacity = '1';
+                item.setAttribute('data-person-id', response.person.personId);
+                item.id = ''; // Remove temp id
+                item.classList.remove('optimistic-item');
+                
+                // Update content
+                var detailDiv = item.querySelector('.list-item-detail');
+                if (detailDiv) detailDiv.remove(); // Remove "Saving..."
+                
+                // Add actions
+                var actionsDiv = item.querySelector('.list-item-actions');
+                actionsDiv.innerHTML = 
+                  '<button class="button-small button-edit" onclick="handleEditPersonClick(\'' + escapeHtml(response.person.personId) + '\')">Edit</button>' +
+                  '<button class="button-small button-delete" onclick="handleDeletePersonClick(\'' + escapeHtml(response.person.personId) + '\', \'' + escapeHtml(response.person.name) + '\')">Delete</button>';
+              } else {
+                 loadPeopleList(); // Fallback
+              }
             } else {
+              // Remove optimistic item on failure
+              var item = document.getElementById('list-item-' + tempId);
+              if (item) item.remove();
+              
+              // Restore empty state if needed
+              if (listContainer.children.length === 0) {
+                 renderPeopleList([]); // Restores empty state
+              }
+              
               showError(response.error || 'Failed to add person');
+              // Restore form value so user can try again
+              nameInput.value = name;
             }
           })
           .withFailureHandler(function(error) {
-            hideLoading();
+            // Remove optimistic item on failure
+            var item = document.getElementById('list-item-' + tempId);
+            if (item) item.remove();
+             
+             // Restore empty state if needed
+            if (listContainer.children.length === 0) {
+                 renderPeopleList([]);
+            }
+
             showError('Failed to add person: ' + error.message);
+            nameInput.value = name;
           })
           .addPerson(name);
       }
@@ -942,22 +1019,28 @@
           minRecurrenceIntervalWeeks: interval
         };
 
-        // Submit to server
-        showLoading();
+        // OPTIMISTIC UI UPDATE: Assume success immediately
+        // Don't show blocking loading spinner
+        // showLoading(); 
+        
+        // Show non-blocking success/saving message
+        showSuccess('Saving configuration...');
+        clearConfigFormState(); // Clear draft state immediately
 
         google.script.run
           .withSuccessHandler(function(response) {
-            hideLoading();
+            // hideLoading(); // Not needed as we didn't show it
 
             if (response.success) {
-              showSuccess('Configuration saved successfully');
-              clearConfigFormState();
+              // Update success message to confirmed
+              showSuccess('Configuration saved'); 
             } else {
               showError(response.error || 'Failed to save configuration');
+              // Probably should mark form as dirty again or reload previous config
             }
           })
           .withFailureHandler(function(error) {
-            hideLoading();
+            // hideLoading();
             showError('Failed to save configuration: ' + error.message);
           })
           .updateOneToOneConfig(config);

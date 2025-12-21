@@ -356,21 +356,74 @@ function createAllMeetings() {
       config.meetingDurationMinutes
     );
 
-    // Update people sheet with calendar event IDs
+    // Update people sheet with calendar event IDs using BATCH operations
     var spreadsheet = getOrCreateConfigSheet();
     var peopleSheet = spreadsheet.getSheetByName('OneToOnePeople');
-
+    
+    // Create map of results for faster lookup
+    var itemsToUpdate = {};
+    var updateCount = 0;
+    
     for (var i = 0; i < results.length; i++) {
       var result = results[i];
       if (result.success && result.eventId) {
-        // Find person row and update calendarEventId
-        var allData = batchRead(peopleSheet);
-        for (var j = 1; j < allData.length; j++) {
-          if (allData[j][0] === result.personId) {
-            var rowIndex = j + 1;
-            peopleSheet.getRange(rowIndex, 3).setValue(result.eventId); // Column 3 is calendarEventId (1-indexed)
-            break;
+        itemsToUpdate[result.personId] = result.eventId;
+        updateCount++;
+      }
+    }
+    
+    // Only access sheet if we have updates
+    if (updateCount > 0) {
+      log('Batch updating ' + updateCount + ' records in sheet');
+      
+      // Read all data once
+      var allData = batchRead(peopleSheet);
+      var rowsToUpdate = [];
+      
+      // Update in memory
+      for (var j = 1; j < allData.length; j++) {
+        var personId = allData[j][0];
+        if (itemsToUpdate.hasOwnProperty(personId)) {
+          // Update the calendarEventId (column index 2, 0-based) in the row data
+          // We need to write back to the sheet, so we'll collect the updates
+          // Since batchRead returns values, we need to carefully construct the write
+          // Easier approach: Get the full range and setValues, but that might be heavy if sheet is huge.
+          // Alternative: Just update column C (Calendar Event ID)
+          
+          // Let's rely on range updates for specific cells if sparse, or full refill if dense.
+          // Given this is "createAll", it's likely dense updates.
+          
+          // Construct the update array for the Calendar Event ID column
+          // We'll read the specific column range to be precise
+        }
+      }
+      
+      // Better Batch Strategy:
+      // 1. Read all IDs (Column A)
+      // 2. Prepare array of Event IDs (Column C)
+      // 3. Write entire Column C back
+      
+      var lastRow = peopleSheet.getLastRow();
+      if (lastRow > 1) {
+        var idRange = peopleSheet.getRange(2, 1, lastRow - 1, 1);
+        var idValues = idRange.getValues(); // [[id1], [id2], ...]
+        
+        var eventIdRange = peopleSheet.getRange(2, 3, lastRow - 1, 1);
+        var eventIdValues = eventIdRange.getValues(); // [[evt1], [evt2], ...]
+        
+        var modified = false;
+        
+        for (var k = 0; k < idValues.length; k++) {
+          var pId = idValues[k][0];
+          if (itemsToUpdate.hasOwnProperty(pId)) {
+            eventIdValues[k][0] = itemsToUpdate[pId];
+            modified = true;
           }
+        }
+        
+        if (modified) {
+          eventIdRange.setValues(eventIdValues);
+          log('Batch update completed');
         }
       }
     }
@@ -655,6 +708,7 @@ function regenerateAllMeetings() {
     // Step 1: Delete all existing meetings
     var deletedCount = 0;
     var deleteFailures = 0;
+    var idsToClear = []; // NEW: Collect IDs to clear in batch
 
     for (var i = 0; i < people.length; i++) {
       var person = people[i];
@@ -671,17 +725,39 @@ function regenerateAllMeetings() {
           deleteFailures++;
         }
 
-        // Clear calendarEventId from person record
-        var spreadsheet = getOrCreateConfigSheet();
-        var peopleSheet = spreadsheet.getSheetByName('OneToOnePeople');
-        var allData = batchRead(peopleSheet);
-
-        for (var j = 1; j < allData.length; j++) {
-          if (allData[j][0] === person.personId) {
-            var rowIndex = j + 1;
-            peopleSheet.getRange(rowIndex, 3).setValue(''); // Clear calendarEventId (column 3, 1-indexed)
-            break;
+        // Clear calendarEventId from person record - BATCH PREPARATION
+        // Instead of writing one by one, we'll mark it for batch clear
+        idsToClear.push(person.personId);
+      }
+    }
+    
+    // Batch clear IDs from sheet
+    if (idsToClear.length > 0) {
+      log('Batch clearing ' + idsToClear.length + ' IDs from sheet');
+      var spreadsheet = getOrCreateConfigSheet();
+      var peopleSheet = spreadsheet.getSheetByName('OneToOnePeople');
+      
+      var lastRow = peopleSheet.getLastRow();
+      if (lastRow > 1) {
+        var idRange = peopleSheet.getRange(2, 1, lastRow - 1, 1);
+        var idValues = idRange.getValues();
+        
+        var eventIdRange = peopleSheet.getRange(2, 3, lastRow - 1, 1);
+        var eventIdValues = eventIdRange.getValues();
+        
+        var modified = false;
+        var idsSet = {};
+        idsToClear.forEach(function(id) { idsSet[id] = true; });
+        
+        for (var k = 0; k < idValues.length; k++) {
+          if (idsSet[idValues[k][0]]) {
+            eventIdValues[k][0] = ''; // Clear it
+            modified = true;
           }
+        }
+        
+        if (modified) {
+          eventIdRange.setValues(eventIdValues);
         }
       }
     }
@@ -744,20 +820,43 @@ function regenerateAllMeetings() {
       config.meetingDurationMinutes
     );
 
-    // Update people sheet with new calendar event IDs
+    // Update people sheet with new calendar event IDs - BATCH OPERATION
     var spreadsheet = getOrCreateConfigSheet();
     var peopleSheet = spreadsheet.getSheetByName('OneToOnePeople');
-
+    
+    var itemsToUpdate = {};
+    var updateCount = 0;
+    
     for (var i = 0; i < results.length; i++) {
       var result = results[i];
       if (result.success && result.eventId) {
-        var allData = batchRead(peopleSheet);
-        for (var j = 1; j < allData.length; j++) {
-          if (allData[j][0] === result.personId) {
-            var rowIndex = j + 1;
-            peopleSheet.getRange(rowIndex, 3).setValue(result.eventId); // Column 3 is calendarEventId (1-indexed)
-            break;
+        itemsToUpdate[result.personId] = result.eventId;
+        updateCount++;
+      }
+    }
+    
+    if (updateCount > 0) {
+      log('Batch updating ' + updateCount + ' records in sheet (regeneration)');
+      var lastRow = peopleSheet.getLastRow();
+      if (lastRow > 1) {
+        var idRange = peopleSheet.getRange(2, 1, lastRow - 1, 1);
+        var idValues = idRange.getValues();
+        
+        var eventIdRange = peopleSheet.getRange(2, 3, lastRow - 1, 1);
+        var eventIdValues = eventIdRange.getValues();
+        
+        var modified = false;
+        
+        for (var k = 0; k < idValues.length; k++) {
+          var pId = idValues[k][0];
+          if (itemsToUpdate.hasOwnProperty(pId)) {
+            eventIdValues[k][0] = itemsToUpdate[pId];
+            modified = true;
           }
+        }
+        
+        if (modified) {
+          eventIdRange.setValues(eventIdValues);
         }
       }
     }
