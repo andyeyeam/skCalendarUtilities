@@ -1,6 +1,7 @@
 # Google Apps Script
 .clasp.json
 .claspignore
+src/appsscript.json
 
 # Node.js (if using clasp CLI)
 node_modules/
