@@ -321,6 +321,10 @@ function listMeetingSlots() {
       };
     }
 
+    // Get spreadsheet timezone to prevent offset issues
+    var sheetTimeZone = spreadsheet.getSpreadsheetTimeZone();
+    Logger.log('Spreadsheet TimeZone: ' + sheetTimeZone);
+
     // Read all data from sheet
     var allData = batchRead(slotsSheet);
     Logger.log('Read ' + allData.length + ' rows from sheet');
@@ -330,6 +334,20 @@ function listMeetingSlots() {
     for (var i = 1; i < allData.length; i++) {
       // Skip empty rows
       if (allData[i][0] && allData[i][0].toString().trim().length > 0) {
+        
+        // Fix for timezone issue: If sheet returns Date objects, they are in Script TimeZone.
+        // We must format them back to strings using the Spreadsheet's TimeZone to preserve the "face value" (HH:MM).
+        
+        // Handle Start Time (Index 2)
+        if (allData[i][2] instanceof Date) {
+          allData[i][2] = Utilities.formatDate(allData[i][2], sheetTimeZone, 'HH:mm');
+        }
+        
+        // Handle End Time (Index 3)
+        if (allData[i][3] instanceof Date) {
+          allData[i][3] = Utilities.formatDate(allData[i][3], sheetTimeZone, 'HH:mm');
+        }
+
         var slot = rowToSlot(allData[i]);
 
         // Explicitly serialize to plain object (ensure JSON compatibility)
