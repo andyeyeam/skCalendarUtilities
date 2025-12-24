@@ -450,7 +450,11 @@ function createAllMeetings() {
     for (var i = 0; i < results.length; i++) {
       var result = results[i];
       if (result.success && result.eventId) {
-        itemsToUpdate[result.personId] = result.eventId;
+        itemsToUpdate[result.personId] = {
+          eventId: result.eventId,
+          day: result.weekday,
+          time: result.startTime
+        };
         updateCount++;
       }
     }
@@ -459,33 +463,6 @@ function createAllMeetings() {
     if (updateCount > 0) {
       log('Batch updating ' + updateCount + ' records in sheet');
       
-      // Read all data once
-      var allData = batchRead(peopleSheet);
-      var rowsToUpdate = [];
-      
-      // Update in memory
-      for (var j = 1; j < allData.length; j++) {
-        var personId = allData[j][0];
-        if (itemsToUpdate.hasOwnProperty(personId)) {
-          // Update the calendarEventId (column index 2, 0-based) in the row data
-          // We need to write back to the sheet, so we'll collect the updates
-          // Since batchRead returns values, we need to carefully construct the write
-          // Easier approach: Get the full range and setValues, but that might be heavy if sheet is huge.
-          // Alternative: Just update column C (Calendar Event ID)
-          
-          // Let's rely on range updates for specific cells if sparse, or full refill if dense.
-          // Given this is "createAll", it's likely dense updates.
-          
-          // Construct the update array for the Calendar Event ID column
-          // We'll read the specific column range to be precise
-        }
-      }
-      
-      // Better Batch Strategy:
-      // 1. Read all IDs (Column A)
-      // 2. Prepare array of Event IDs (Column C)
-      // 3. Write entire Column C back
-      
       var lastRow = peopleSheet.getLastRow();
       if (lastRow > 1) {
         var idRange = peopleSheet.getRange(2, 1, lastRow - 1, 1);
@@ -493,19 +470,26 @@ function createAllMeetings() {
         
         var eventIdRange = peopleSheet.getRange(2, 3, lastRow - 1, 1);
         var eventIdValues = eventIdRange.getValues(); // [[evt1], [evt2], ...]
+
+        var dayTimeRange = peopleSheet.getRange(2, 6, lastRow - 1, 2);
+        var dayTimeValues = dayTimeRange.getValues(); // [[day1, time1], ...]
         
         var modified = false;
         
         for (var k = 0; k < idValues.length; k++) {
           var pId = idValues[k][0];
           if (itemsToUpdate.hasOwnProperty(pId)) {
-            eventIdValues[k][0] = itemsToUpdate[pId];
+            var data = itemsToUpdate[pId];
+            eventIdValues[k][0] = data.eventId;
+            dayTimeValues[k][0] = data.day;
+            dayTimeValues[k][1] = data.time;
             modified = true;
           }
         }
         
         if (modified) {
           eventIdRange.setValues(eventIdValues);
+          dayTimeRange.setValues(dayTimeValues);
           log('Batch update completed');
         }
       }
@@ -606,7 +590,10 @@ function viewMeetings() {
           personId: person.personId,
           personName: person.name,
           eventId: person.calendarEventId,
-          eventTitle: person.name + ' + Andy Cheetham 1:1'
+          eventId: person.calendarEventId,
+          eventTitle: person.name + ' + Andy Cheetham 1:1',
+          meetingDay: person.meetingDay,
+          meetingTime: person.meetingTime
         });
         log('Added meeting for person', { personName: person.name });
       }
@@ -614,6 +601,7 @@ function viewMeetings() {
 
     var metadata = {
       recurrenceWeeks: config.calculatedRecurrenceWeeks || null,
+      meetingDurationMinutes: config.meetingDurationMinutes || 30,
       peopleWithMeetings: peopleWithMeetings,
       peopleWithoutMeetings: people.length - peopleWithMeetings
     };
@@ -919,7 +907,11 @@ function regenerateAllMeetings() {
     for (var i = 0; i < results.length; i++) {
       var result = results[i];
       if (result.success && result.eventId) {
-        itemsToUpdate[result.personId] = result.eventId;
+        itemsToUpdate[result.personId] = {
+            eventId: result.eventId,
+            day: result.weekday,
+            time: result.startTime
+        };
         updateCount++;
       }
     }
@@ -934,18 +926,25 @@ function regenerateAllMeetings() {
         var eventIdRange = peopleSheet.getRange(2, 3, lastRow - 1, 1);
         var eventIdValues = eventIdRange.getValues();
         
+        var dayTimeRange = peopleSheet.getRange(2, 6, lastRow - 1, 2);
+        var dayTimeValues = dayTimeRange.getValues();
+
         var modified = false;
         
         for (var k = 0; k < idValues.length; k++) {
           var pId = idValues[k][0];
           if (itemsToUpdate.hasOwnProperty(pId)) {
-            eventIdValues[k][0] = itemsToUpdate[pId];
+            var data = itemsToUpdate[pId];
+            eventIdValues[k][0] = data.eventId;
+            dayTimeValues[k][0] = data.day;
+            dayTimeValues[k][1] = data.time;
             modified = true;
           }
         }
         
         if (modified) {
           eventIdRange.setValues(eventIdValues);
+          dayTimeRange.setValues(dayTimeValues);
         }
       }
     }

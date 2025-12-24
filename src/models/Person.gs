@@ -8,17 +8,21 @@
  * @param {string} personId - Unique identifier (UUID)
  * @param {string} name - Person's full name
  * @param {string} calendarEventId - Associated calendar event ID (optional)
+ * @param {string} meetingDay - Scheduled meeting day (optional)
+ * @param {string} meetingTime - Scheduled meeting time (optional)
  * @param {string} createdAt - ISO timestamp (optional)
  * @param {string} updatedAt - ISO timestamp (optional)
  * @returns {Object} Person object
  */
-function createPerson(personId, name, calendarEventId, createdAt, updatedAt) {
+function createPerson(personId, name, calendarEventId, meetingDay, meetingTime, createdAt, updatedAt) {
   var now = new Date().toISOString();
 
   return {
     personId: personId || Utilities.getUuid(),
     name: name,
     calendarEventId: calendarEventId || '',
+    meetingDay: meetingDay || '',
+    meetingTime: meetingTime || '',
     createdAt: createdAt || now,
     updatedAt: updatedAt || now
   };
@@ -57,7 +61,9 @@ function personToRow(person) {
     person.name,
     person.calendarEventId,
     person.createdAt,
-    person.updatedAt
+    person.updatedAt,
+    person.meetingDay,
+    person.meetingTime
   ];
 }
 
@@ -71,6 +77,8 @@ function rowToPerson(row) {
     row[0], // personId
     row[1], // name
     row[2], // calendarEventId
+    row[5], // meetingDay (New Col 6)
+    row[6], // meetingTime (New Col 7)
     row[3], // createdAt
     row[4]  // updatedAt
   );

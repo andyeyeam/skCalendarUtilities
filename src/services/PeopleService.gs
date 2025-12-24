@@ -251,6 +251,8 @@ function editPerson(personId, name) {
       personId,
       name,
       existingPerson.calendarEventId,
+      existingPerson.meetingDay,
+      existingPerson.meetingTime,
       existingPerson.createdAt,
       new Date().toISOString() // Update updatedAt timestamp
     );

@@ -1655,10 +1655,17 @@
       for (var i = 0; i < meetings.length; i++) {
         var meeting = meetings[i];
 
+        var detailText = escapeHtml(meeting.eventTitle);
+        if (meeting.meetingDay && meeting.meetingTime) {
+          var docDuration = metadata && metadata.meetingDurationMinutes ? ' (' + metadata.meetingDurationMinutes + ' mins)' : '';
+          // Ensure nice formatting
+          detailText = escapeHtml(meeting.meetingDay) + ' @ ' + escapeHtml(meeting.meetingTime) + docDuration;
+        }
+
         html += '<div class="list-item" data-person-id="' + escapeHtml(meeting.personId) + '">' +
           '<div class="list-item-info">' +
           '<div class="list-item-name">' + escapeHtml(meeting.personName) + '</div>' +
-          '<div class="list-item-detail">' + escapeHtml(meeting.eventTitle) + '</div>' +
+          '<div class="list-item-detail">' + detailText + '</div>' +
           '</div>' +
           '<div class="list-item-actions">' +
           '<button class="button-small button-delete" onclick="handleDeleteMeetingClick(\'' + escapeHtml(meeting.personId) + '\', \'' + escapeHtml(meeting.personName) + '\')">Delete</button>' +
