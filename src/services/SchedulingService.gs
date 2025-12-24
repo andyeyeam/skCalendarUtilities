@@ -238,7 +238,7 @@ function calculateNextOccurrence(weekday, startTimeMinutes, durationMinutes, wee
 
 /**
  * Execute scheduling - create calendar events for all assignments
- * Handles conflicts by bumping start date up to 5 times.
+ * Always creates events regardless of conflicts (double-booking allowed).
  * @param {Calendar} calendar - Calendar object
  * @param {Array<Object>} assignments - Array of assignment objects
  * @param {number} durationMinutes - Meeting duration in minutes
@@ -250,74 +250,43 @@ function executeScheduling(calendar, assignments, durationMinutes) {
   for (var i = 0; i < assignments.length; i++) {
     var assignment = assignments[i];
     var person = assignment.person;
-    var attempt = 0;
-    var maxAttempts = 5;
-    var scheduled = false;
-    var currentWeekOffset = assignment.weekOffset;
-    var conflictFound = false;
-    var finalError = '';
 
-    while (!scheduled && attempt < maxAttempts) {
-        try {
-            // Calculate next occurrence date/time
-            var startTimeMinutes = parseTime(assignment.startTime);
-            var occurrence = calculateNextOccurrence(assignment.weekday, startTimeMinutes, durationMinutes, currentWeekOffset);
+    try {
+      // Calculate next occurrence date/time
+      var startTimeMinutes = parseTime(assignment.startTime);
+      var occurrence = calculateNextOccurrence(assignment.weekday, startTimeMinutes, durationMinutes, assignment.weekOffset);
 
-            // Check for conflicts
-            var conflicts = calendar.getEvents(occurrence.startDateTime, occurrence.endDateTime);
-            
-            if (conflicts.length > 0) {
-                // Conflict found! Bump offset.
-                log('Conflict found for ' + person.name + ' at ' + occurrence.startDateTime + '. Bumping to next week.', {
-                    attempt: attempt,
-                    conflicts: conflicts.length
-                });
-                currentWeekOffset += 1; // Try next week
-                conflictFound = true;
-                attempt++;
-                continue;
-            }
+      // Create recurring event directly (ignoring conflicts)
+      var eventId = createOneToOneMeeting(
+        calendar,
+        person.name,
+        assignment.weekday,
+        occurrence.startDateTime,
+        occurrence.endDateTime,
+        assignment.recurrenceWeeks
+      );
 
-            // No conflict, create event
-            var eventId = createOneToOneMeeting(
-                calendar,
-                person.name,
-                assignment.weekday,
-                occurrence.startDateTime,
-                occurrence.endDateTime,
-                assignment.recurrenceWeeks
-            );
+      results.push({
+        personId: person.personId,
+        personName: person.name,
+        eventId: eventId,
+        weekday: assignment.weekday,
+        startTime: assignment.startTime,
+        endTime: assignment.endTime,
+        finalStartDate: occurrence.startDateTime.toISOString(),
+        wasBumped: false,
+        success: true
+      });
 
-            results.push({
-                personId: person.personId,
-                personName: person.name,
-                eventId: eventId,
-                weekday: assignment.weekday,
-                startTime: assignment.startTime,
-                endTime: assignment.endTime,
-                finalStartDate: occurrence.startDateTime.toISOString(),
-                wasBumped: conflictFound,
-                success: true
-            });
-            scheduled = true;
-
-        } catch (e) {
-            finalError = e.message;
-            attempt++; // Count error as attempt or fatal? 
-            // If it's a create error, probably fatal.
-            break;
-        }
-    }
-
-    if (!scheduled) {
-         error('Failed to create meeting for person after attempts', { personId: person.personId, attempts: attempt, error: finalError });
-         results.push({
-            personId: person.personId,
-            personName: person.name,
-            eventId: null,
-            success: false,
-            error: finalError || ('Unable to find free slot after ' + maxAttempts + ' attempts')
-         });
+    } catch (e) {
+      error('Failed to create meeting for person', { personId: person.personId, error: e.message });
+      results.push({
+        personId: person.personId,
+        personName: person.name,
+        eventId: null,
+        success: false,
+        error: e.message
+      });
     }
   }
 
