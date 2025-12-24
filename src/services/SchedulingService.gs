@@ -443,6 +443,10 @@ function createAllMeetings() {
         var dayTimeRange = peopleSheet.getRange(2, 6, lastRow - 1, 2);
         var dayTimeValues = dayTimeRange.getValues(); // [[day1, time1], ...]
         
+        // Fix: Force ensure headers for Day/Time exist
+        peopleSheet.getRange('F1').setValue('MeetingDay');
+        peopleSheet.getRange('G1').setValue('MeetingTime');
+        
         var modified = false;
         
         for (var k = 0; k < idValues.length; k++) {
@@ -460,6 +464,7 @@ function createAllMeetings() {
           eventIdRange.setValues(eventIdValues);
           dayTimeRange.setValues(dayTimeValues);
           log('Batch update completed');
+          SpreadsheetApp.flush(); // Force persistence
         }
       }
     }
@@ -898,6 +903,10 @@ function regenerateAllMeetings() {
         var dayTimeRange = peopleSheet.getRange(2, 6, lastRow - 1, 2);
         var dayTimeValues = dayTimeRange.getValues();
 
+        // Fix: Force ensure headers for Day/Time exist
+        peopleSheet.getRange('F1').setValue('MeetingDay');
+        peopleSheet.getRange('G1').setValue('MeetingTime');
+
         var modified = false;
         
         for (var k = 0; k < idValues.length; k++) {
@@ -914,6 +923,7 @@ function regenerateAllMeetings() {
         if (modified) {
           eventIdRange.setValues(eventIdValues);
           dayTimeRange.setValues(dayTimeValues);
+          SpreadsheetApp.flush(); // Force persistence
         }
       }
     }
