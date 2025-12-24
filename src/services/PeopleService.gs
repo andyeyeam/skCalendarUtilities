@@ -377,53 +377,76 @@ function deletePerson(personId) {
  * @returns {Object} {success: boolean, people: Array<Object>, count: number, error: string}
  */
 function listPeople() {
+  // Wrap everything in try-catch to ensure we always return something
   try {
-    log('listPeople started');
-
     // Get spreadsheet and people sheet
     var spreadsheet = getOrCreateConfigSheet();
-    var peopleSheet = spreadsheet.getSheetByName('OneToOnePeople');
+    if (!spreadsheet) {
+      return {
+        success: false,
+        error: 'Failed to get spreadsheet',
+        errorType: 'system',
+        people: [],
+        count: 0
+      };
+    }
 
+    var peopleSheet = spreadsheet.getSheetByName('OneToOnePeople');
     if (!peopleSheet) {
       return {
         success: false,
         error: 'OneToOnePeople sheet not found',
-        errorType: 'system'
+        errorType: 'system',
+        people: [],
+        count: 0
       };
     }
 
-    // Read all data from sheet
-    var allData = batchRead(peopleSheet);
+    // Read all data from sheet - explicitly read 7 columns
+    var lastRow = peopleSheet.getLastRow();
+    if (lastRow === 0 || lastRow === 1) {
+      // No data rows (only header or empty)
+      return {
+        success: true,
+        people: [],
+        count: 0
+      };
+    }
+
+    var allData = peopleSheet.getRange(1, 1, lastRow, 7).getValues();
 
     // Skip header row and convert to person objects
     var people = [];
     for (var i = 1; i < allData.length; i++) {
-        if (i === 1) {
-            log('listPeople debug: First row raw data', { 
-                rowLength: allData[i].length, 
-                col0: allData[i][0], 
-                col2: allData[i][2], // CalendarEventId ?
-                col5: allData[i][5]  // MeetingDay ?
-            });
-        }
       // Skip empty rows
       if (allData[i][0] && allData[i][0].toString().trim().length > 0) {
-        var person = rowToPerson(allData[i]);
+        // Manually create person object instead of using rowToPerson
+        // to avoid any issues with that function
+        var now = new Date().toISOString();
+        var person = {
+          personId: String(allData[i][0] || ''),
+          name: String(allData[i][1] || ''),
+          calendarEventId: String(allData[i][2] || ''),
+          createdAt: allData[i][3] ? new Date(allData[i][3]).toISOString() : now,
+          updatedAt: allData[i][4] ? new Date(allData[i][4]).toISOString() : now,
+          meetingDay: String(allData[i][5] || ''),
+          meetingTime: String(allData[i][6] || '')
+        };
         people.push(person);
       }
     }
 
-    log('listPeople completed', { count: people.length });
     return {
       success: true,
       people: people,
       count: people.length
     };
   } catch (e) {
-    error('listPeople failed', e);
+    // Log the error and return a safe error response
+    Logger.log('listPeople error: ' + e.toString());
     return {
       success: false,
-      error: e.message || 'Failed to list people',
+      error: String(e.message || e.toString() || 'Unknown error'),
       errorType: 'system',
       people: [],
       count: 0
@@ -570,5 +593,44 @@ function clearAllPeople() {
       error: e.message || 'Failed to clear all people',
       errorType: 'system'
     };
+  }
+}
+
+/**
+ * Diagnostic function to check sheet structure and data
+ * @returns {Object} Diagnostic information about the sheet
+ */
+function diagnosticCheckPeopleSheet() {
+  try {
+    var spreadsheet = getOrCreateConfigSheet();
+    var peopleSheet = spreadsheet.getSheetByName('OneToOnePeople');
+
+    if (!peopleSheet) {
+      return { success: false, error: 'Sheet not found' };
+    }
+
+    var lastRow = peopleSheet.getLastRow();
+    var lastCol = peopleSheet.getLastColumn();
+
+    var headers = [];
+    if (lastCol > 0) {
+      headers = peopleSheet.getRange(1, 1, 1, lastCol).getValues()[0];
+    }
+
+    var allData = [];
+    if (lastRow > 1 && lastCol > 0) {
+      allData = peopleSheet.getRange(1, 1, lastRow, lastCol).getValues();
+    }
+
+    return {
+      success: true,
+      lastRow: lastRow,
+      lastColumn: lastCol,
+      headers: headers,
+      dataRows: allData.length - 1,
+      sampleData: allData.slice(0, 3)
+    };
+  } catch (e) {
+    return { success: false, error: e.message };
   }
 }

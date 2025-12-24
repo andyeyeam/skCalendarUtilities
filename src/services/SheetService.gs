@@ -249,9 +249,21 @@ function ensureOneToOneTabsExist(spreadsheet) {
     var peopleSheet = spreadsheet.getSheetByName('OneToOnePeople');
     if (!peopleSheet) {
       peopleSheet = spreadsheet.insertSheet('OneToOnePeople');
-      var headers = ['PersonId', 'Name', 'CalendarEventId', 'CreatedAt', 'UpdatedAt'];
+      var headers = ['PersonId', 'Name', 'CalendarEventId', 'CreatedAt', 'UpdatedAt', 'MeetingDay', 'MeetingTime'];
       initializeSheetWithHeaders(peopleSheet, headers);
       log('Created OneToOnePeople tab');
+    } else {
+      // Ensure existing sheet has all required columns
+      var currentHeaders = peopleSheet.getRange(1, 1, 1, peopleSheet.getLastColumn()).getValues()[0];
+      var requiredHeaders = ['PersonId', 'Name', 'CalendarEventId', 'CreatedAt', 'UpdatedAt', 'MeetingDay', 'MeetingTime'];
+
+      if (currentHeaders.length < requiredHeaders.length) {
+        // Add missing columns
+        for (var i = currentHeaders.length; i < requiredHeaders.length; i++) {
+          peopleSheet.getRange(1, i + 1).setValue(requiredHeaders[i]);
+        }
+        log('Added missing columns to OneToOnePeople tab');
+      }
     }
 
     // Tab 2: OneToOneConfig
