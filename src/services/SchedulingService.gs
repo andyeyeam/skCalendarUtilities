@@ -10,6 +10,14 @@
  * @param {number} minInterval - Minimum acceptable interval in weeks
  * @returns {number} Recurrence interval in weeks
  */
+/**
+ * Calculate optimal recurrence interval based on people count and available slots
+ * Rule: Max of (People / Slots rounded up) and Minimum Interval
+ * @param {number} peopleCount - Number of people to schedule
+ * @param {number} slotsPerWeek - Number of available slots per week
+ * @param {number} minInterval - Minimum acceptable interval in weeks
+ * @returns {number} Recurrence interval in weeks
+ */
 function calculateRecurrenceInterval(peopleCount, slotsPerWeek, minInterval) {
   if (peopleCount === 0 || slotsPerWeek === 0) {
     return minInterval;
@@ -60,10 +68,10 @@ function expandSlotsIntoPeriods(slots, durationMinutes) {
 }
 
 /**
- * Assign people to meeting periods using interval stride distribution
- * Ensures even spacing across recurrence cycle and prevents slot conflicts within same week
+ * Assign people to meeting periods using Stride distribution
+ * Spreads people evenly across the entire recurrence interval
  * @param {Array<Object>} people - Array of Person objects
- * @param {Array<Object>} periods - Array of period objects
+ * @param {Array<Object>} periods - Array of available slot periods
  * @param {number} recurrenceWeeks - Recurrence interval in weeks
  * @returns {Array<Object>} Array of assignments {person, period, weekOffset}
  */
@@ -71,25 +79,40 @@ function assignPeopleToPeriods(people, periods, recurrenceWeeks) {
   var assignments = [];
   var slotsPerWeek = periods.length;
 
-  // Calculate spacing between week offsets
-  var spacing = Math.floor(recurrenceWeeks / slotsPerWeek);
-
+  // Stride Calculation
+  // Total potential slots across the cycle = slotsPerWeek * recurrenceWeeks
+  // We want to distribute 'people.length' items across 'totalSlots'
+  
+  // To minimize gaps w.r.t start of day, we effectively traverse slots sequentially
+  // but stepped by 'stride'.
+  
+  // Actually, 'Stride' is best for "Evenly Distributed".
+  
+  var totalSlotsInCycle = slotsPerWeek * recurrenceWeeks;
+  var stride = totalSlotsInCycle / people.length;
+  
+  // Sort people to ensure deterministic order (e.g. by name)
+  // Assuming people are already sorted or order doesn't strictly matter for "who gets what"
+  // providing they are just distributed.
+  
   for (var i = 0; i < people.length; i++) {
     var person = people[i];
-
-    // Calculate week offset for even distribution
-    var weekOffset = Math.floor(i / slotsPerWeek) * spacing;
-
-    // Assign to slot within the week
-    var slotIndex = i % slotsPerWeek;
-    var period = periods[slotIndex];
+    
+    // Calculate the target "virtual slot index" in the flattened cycle
+    var targetSlotIndex = Math.floor(i * stride);
+    
+    // Convert virtual index to Week Offset and Period Index
+    var weekOffset = Math.floor(targetSlotIndex / slotsPerWeek);
+    var periodIndex = targetSlotIndex % slotsPerWeek;
+    
+    var period = periods[periodIndex];
 
     assignments.push({
       person: person,
       weekday: period.weekday,
       startTime: period.startTime,
       endTime: period.endTime,
-      weekOffset: weekOffset,          // NEW: Week offset within recurrence cycle
+      weekOffset: weekOffset,
       recurrenceWeeks: recurrenceWeeks
     });
   }
@@ -113,6 +136,7 @@ function createOneToOneMeeting(calendar, personName, weekday, startDateTime, end
     var title = personName + ' + Andy Cheetham 1:1';
 
     // Create recurrence rule (repeats indefinitely)
+    // Using simple weekly rule
     var recurrence = CalendarApp.newRecurrence()
       .addWeeklyRule()
       .interval(intervalWeeks);
@@ -167,16 +191,34 @@ function calculateNextOccurrence(weekday, startTimeMinutes, durationMinutes, wee
   var currentDay = today.getDay();
 
   // Calculate days until next occurrence
+  // If today is Monday, and we want Monday. Days until = 0?
+  // Usually we schedule for "Next available".
+  // Let's stick to: If today is < target, strictly ahead.
+  // If today == target, maybe we can schedule today if time is future?
+  // For simplicity: Always schedule at least 1 day out or "Next occurrence on Calendar".
+  
   var daysUntil = (targetDay - currentDay + 7) % 7;
   if (daysUntil === 0) {
-    daysUntil = 7; // If it's today, schedule for next week
+     // If it is today, let's schedule for next week to give notice?
+     // Or schedule for today if confirmed?
+     // Let's default to "Today is valid week 0 start" IF we assume "Week of..."
+     // BUT, weekOffset of 0 means "This week".
+     // If we are past the day, Week 0 is impossible for that day.
+     
+     // Simplified Logic:
+     // Find the date of the "Current Week's" occurrence of this Day.
+     // If that date is in the past, move to next week and decrement offset? 
+     // No, the offset is "Weeks from Start".
+     
+     // Let's Assume "Start Date" is "Next instance of Day".
+     daysUntil = 7; 
   }
 
   // Create start date/time
   var startDate = new Date(today);
-  startDate.setDate(today.getDate() + daysUntil);
+  startDate.setDate(today.getDate() + daysUntil); // Next instance of Day
 
-  // NEW: Apply week offset
+  // Apply week offset
   startDate.setDate(startDate.getDate() + (weekOffset * 7));
 
   startDate.setHours(Math.floor(startTimeMinutes / 60));
@@ -196,6 +238,7 @@ function calculateNextOccurrence(weekday, startTimeMinutes, durationMinutes, wee
 
 /**
  * Execute scheduling - create calendar events for all assignments
+ * Handles conflicts by bumping start date up to 5 times.
  * @param {Calendar} calendar - Calendar object
  * @param {Array<Object>} assignments - Array of assignment objects
  * @param {number} durationMinutes - Meeting duration in minutes
@@ -207,40 +250,74 @@ function executeScheduling(calendar, assignments, durationMinutes) {
   for (var i = 0; i < assignments.length; i++) {
     var assignment = assignments[i];
     var person = assignment.person;
+    var attempt = 0;
+    var maxAttempts = 5;
+    var scheduled = false;
+    var currentWeekOffset = assignment.weekOffset;
+    var conflictFound = false;
+    var finalError = '';
 
-    try {
-      // Calculate next occurrence date/time
-      var startTimeMinutes = parseTime(assignment.startTime);
-      var occurrence = calculateNextOccurrence(assignment.weekday, startTimeMinutes, durationMinutes, assignment.weekOffset);
+    while (!scheduled && attempt < maxAttempts) {
+        try {
+            // Calculate next occurrence date/time
+            var startTimeMinutes = parseTime(assignment.startTime);
+            var occurrence = calculateNextOccurrence(assignment.weekday, startTimeMinutes, durationMinutes, currentWeekOffset);
 
-      // Create recurring event
-      var eventId = createOneToOneMeeting(
-        calendar,
-        person.name,
-        assignment.weekday,
-        occurrence.startDateTime,
-        occurrence.endDateTime,
-        assignment.recurrenceWeeks
-      );
+            // Check for conflicts
+            var conflicts = calendar.getEvents(occurrence.startDateTime, occurrence.endDateTime);
+            
+            if (conflicts.length > 0) {
+                // Conflict found! Bump offset.
+                log('Conflict found for ' + person.name + ' at ' + occurrence.startDateTime + '. Bumping to next week.', {
+                    attempt: attempt,
+                    conflicts: conflicts.length
+                });
+                currentWeekOffset += 1; // Try next week
+                conflictFound = true;
+                attempt++;
+                continue;
+            }
 
-      results.push({
-        personId: person.personId,
-        personName: person.name,
-        eventId: eventId,
-        weekday: assignment.weekday,
-        startTime: assignment.startTime,
-        endTime: assignment.endTime,
-        success: true
-      });
-    } catch (e) {
-      error('Failed to create meeting for person', { personId: person.personId, error: e.message });
-      results.push({
-        personId: person.personId,
-        personName: person.name,
-        eventId: null,
-        success: false,
-        error: e.message
-      });
+            // No conflict, create event
+            var eventId = createOneToOneMeeting(
+                calendar,
+                person.name,
+                assignment.weekday,
+                occurrence.startDateTime,
+                occurrence.endDateTime,
+                assignment.recurrenceWeeks
+            );
+
+            results.push({
+                personId: person.personId,
+                personName: person.name,
+                eventId: eventId,
+                weekday: assignment.weekday,
+                startTime: assignment.startTime,
+                endTime: assignment.endTime,
+                finalStartDate: occurrence.startDateTime.toISOString(),
+                wasBumped: conflictFound,
+                success: true
+            });
+            scheduled = true;
+
+        } catch (e) {
+            finalError = e.message;
+            attempt++; // Count error as attempt or fatal? 
+            // If it's a create error, probably fatal.
+            break;
+        }
+    }
+
+    if (!scheduled) {
+         error('Failed to create meeting for person after attempts', { personId: person.personId, attempts: attempt, error: finalError });
+         results.push({
+            personId: person.personId,
+            personName: person.name,
+            eventId: null,
+            success: false,
+            error: finalError || ('Unable to find free slot after ' + maxAttempts + ' attempts')
+         });
     }
   }
 
@@ -326,6 +403,12 @@ function createAllMeetings() {
       slotsPerWeek,
       config.minRecurrenceIntervalWeeks
     );
+
+    // Update config with calculated recurrence so UI can display it
+    if (config.calculatedRecurrenceWeeks !== recurrenceWeeks) {
+      config.calculatedRecurrenceWeeks = recurrenceWeeks;
+      updateOneToOneConfig(config);
+    }
 
     // Assign people to periods
     var assignments = assignPeopleToPeriods(people, periods, recurrenceWeeks);
@@ -809,6 +892,12 @@ function regenerateAllMeetings() {
       slotsPerWeek,
       config.minRecurrenceIntervalWeeks
     );
+
+    // Update config with calculated recurrence so UI can display it
+    if (config.calculatedRecurrenceWeeks !== recurrenceWeeks) {
+      config.calculatedRecurrenceWeeks = recurrenceWeeks;
+      updateOneToOneConfig(config);
+    }
 
     // Assign people to periods
     var assignments = assignPeopleToPeriods(people, periods, recurrenceWeeks);
