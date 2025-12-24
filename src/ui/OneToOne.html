@@ -1581,13 +1581,23 @@
           console.log('viewMeetings response:', response);
           hideLoading();
 
+          if (!response) {
+            console.error('viewMeetings returned null');
+            showError('Server returned no data. Please check logs.');
+            return;
+          }
+
           if (response.success) {
             console.log('Meetings count:', response.meetings ? response.meetings.length : 0);
-            console.log('Meetings data:', response.meetings);
             renderMeetingsList(response.meetings, response.metadata);
           } else {
             console.error('viewMeetings failed:', response.error);
-            showError(response.error || 'Failed to load meetings');
+            var errMsg = response.error || 'Failed to load meetings';
+            if (response.debug) {
+              console.log('Server Debug Log:', response.debug);
+              errMsg += '\n\nDebug: ' + response.debug.join('\n');
+            }
+            showError(errMsg);
           }
         })
         .withFailureHandler(function (error) {
@@ -1595,7 +1605,7 @@
           hideLoading();
           showError('Failed to load meetings: ' + error.message);
         })
-        .viewMeetings();
+        .viewMeetingsV2();
     }
 
     /**

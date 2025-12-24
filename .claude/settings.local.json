@@ -34,7 +34,11 @@
       "Bash(for dir in specs/*/)",
       "Bash(if [ -f \"$dir/spec.md\" ])",
       "Bash(then head -20 \"$dir/spec.md\")",
-      "Bash(done)"
+      "Bash(done)",
+      "Bash(clasp logs:*)",
+      "Bash(clasp deploy:*)",
+      "Bash(clasp deployments:*)",
+      "Bash(clasp open:*)"
     ],
     "deny": [],
     "ask": []

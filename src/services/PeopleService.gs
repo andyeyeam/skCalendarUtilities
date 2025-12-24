@@ -398,6 +398,14 @@ function listPeople() {
     // Skip header row and convert to person objects
     var people = [];
     for (var i = 1; i < allData.length; i++) {
+        if (i === 1) {
+            log('listPeople debug: First row raw data', { 
+                rowLength: allData[i].length, 
+                col0: allData[i][0], 
+                col2: allData[i][2], // CalendarEventId ?
+                col5: allData[i][5]  // MeetingDay ?
+            });
+        }
       // Skip empty rows
       if (allData[i][0] && allData[i][0].toString().trim().length > 0) {
         var person = rowToPerson(allData[i]);

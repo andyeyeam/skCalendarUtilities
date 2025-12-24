@@ -449,6 +449,13 @@ function createAllMeetings() {
         
         var modified = false;
         
+        log('Batch update debug', { 
+          sheetIds: idValues.length,
+          updatesCount: updateCount, 
+          firstSheetId: idValues.length > 0 ? idValues[0][0] : 'empty',
+          sampleUpdateKey: Object.keys(itemsToUpdate)[0]
+        });
+
         for (var k = 0; k < idValues.length; k++) {
           var pId = idValues[k][0];
           if (itemsToUpdate.hasOwnProperty(pId)) {
@@ -457,14 +464,19 @@ function createAllMeetings() {
             dayTimeValues[k][0] = data.day;
             dayTimeValues[k][1] = data.time;
             modified = true;
+          } else {
+             // log('No match for ID', { pId: pId }); // Optional: uncomment if needed
           }
         }
         
         if (modified) {
+          log('Modifying sheet values...');
           eventIdRange.setValues(eventIdValues);
           dayTimeRange.setValues(dayTimeValues);
-          log('Batch update completed');
           SpreadsheetApp.flush(); // Force persistence
+          log('Batch update completed successfully');
+        } else {
+          warn('No rows modified during batch update - IDs did not match?');
         }
       }
     }
@@ -520,80 +532,94 @@ function createAllMeetings() {
  * Get all scheduled one-to-one meetings with details
  * @returns {Object} {success: boolean, meetings: Array, count: number, metadata: Object}
  */
-function viewMeetings() {
+/**
+ * Get all scheduled one-to-one meetings with details
+ * Debug-enhanced version
+ * @returns {Object} {success: boolean, meetings: Array, count: number, metadata: Object}
+ */
+function viewMeetingsV2() {
   try {
-    log('viewMeetings started');
+    // Get configuration
+    var config = {
+      meetingDurationMinutes: 30,
+      minRecurrenceIntervalWeeks: 1,
+      calculatedRecurrenceWeeks: 1
+    };
+
+    try {
+      var configResponse = getOneToOneConfig();
+      if (configResponse && configResponse.success && configResponse.config) {
+        config = configResponse.config;
+      }
+    } catch (e) {
+      // Use defaults if config fails
+    }
 
     // Get people
     var peopleResponse = listPeople();
-    if (!peopleResponse.success) {
+
+    if (!peopleResponse || !peopleResponse.success) {
       return {
         success: false,
         error: 'Failed to load people',
-        errorType: 'system'
+        meetings: [],
+        metadata: {}
       };
     }
 
-    var people = peopleResponse.people;
-
-    // Get configuration for title prefix
-    var configResponse = getOneToOneConfig();
-    var config = configResponse.success ? configResponse.config : getDefaultOneToOneConfig();
-
-    // Build meetings array
+    var people = peopleResponse.people || [];
     var meetings = [];
     var peopleWithMeetings = 0;
+    var peopleWithoutMeetings = 0;
 
-    log('Processing people for meetings', { totalPeople: people.length });
-
+    // Build meetings array
     for (var i = 0; i < people.length; i++) {
       var person = people[i];
-      log('Checking person', {
-        personId: person.personId,
-        name: person.name,
-        calendarEventId: person.calendarEventId,
-        hasEventId: !!(person.calendarEventId && person.calendarEventId.trim().length > 0)
-      });
 
-      if (person.calendarEventId && person.calendarEventId.trim().length > 0) {
-        peopleWithMeetings++;
-
-        // For now, we'll create a meeting object without fetching calendar details
-        // Calendar details would require additional API calls which might be slow
+      if (person.calendarEventId && String(person.calendarEventId).trim().length > 0) {
+        // Person has a meeting
         meetings.push({
-          personId: person.personId,
-          personName: person.name,
-          eventId: person.calendarEventId,
-          eventId: person.calendarEventId,
-          eventTitle: person.name + ' + Andy Cheetham 1:1',
-          meetingDay: person.meetingDay,
-          meetingTime: person.meetingTime
+          personId: String(person.personId || ''),
+          personName: String(person.name || ''),
+          eventId: String(person.calendarEventId || ''),
+          eventTitle: String(person.name || '') + ' + Andy Cheetham 1:1',
+          meetingDay: String(person.meetingDay || ''),
+          meetingTime: String(person.meetingTime || '')
         });
-        log('Added meeting for person', { personName: person.name });
+        peopleWithMeetings++;
+      } else {
+        peopleWithoutMeetings++;
       }
     }
 
+    // Build metadata - ensure all values are primitives
+    var recurrenceWeeks = 1;
+    if (config.calculatedRecurrenceWeeks) {
+      recurrenceWeeks = Number(config.calculatedRecurrenceWeeks);
+    } else if (config.minRecurrenceIntervalWeeks) {
+      recurrenceWeeks = Number(config.minRecurrenceIntervalWeeks);
+    }
+
     var metadata = {
-      recurrenceWeeks: config.calculatedRecurrenceWeeks || null,
-      meetingDurationMinutes: config.meetingDurationMinutes || 30,
-      peopleWithMeetings: peopleWithMeetings,
-      peopleWithoutMeetings: people.length - peopleWithMeetings
+      recurrenceWeeks: recurrenceWeeks,
+      peopleWithMeetings: Number(peopleWithMeetings),
+      peopleWithoutMeetings: Number(peopleWithoutMeetings),
+      meetingDurationMinutes: Number(config.meetingDurationMinutes || 30)
     };
 
-    log('viewMeetings completed', { count: meetings.length });
     return {
       success: true,
       meetings: meetings,
-      count: meetings.length,
       metadata: metadata,
-      message: meetings.length === 0 ? 'No meetings scheduled yet' : null
+      message: 'Loaded ' + meetings.length + ' meeting(s)'
     };
+
   } catch (e) {
-    error('viewMeetings failed', e);
     return {
       success: false,
-      error: e.message || 'Failed to view meetings',
-      errorType: 'system'
+      error: 'Error: ' + String(e.message || e),
+      meetings: [],
+      metadata: {}
     };
   }
 }
