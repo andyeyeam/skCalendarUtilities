@@ -77,6 +77,15 @@
       gap: 0.5rem;
     }
 
+    .list-item.compact {
+      padding: 0.5rem 0.75rem;
+      margin-bottom: 0.25rem;
+    }
+
+    .list-item-name a:hover {
+      text-decoration: underline !important;
+    }
+
     /* Button styles */
     .button-small {
       padding: 0.375rem 0.75rem;
@@ -564,10 +573,18 @@
         var person = people[i];
         var hasMeeting = person.calendarEventId && person.calendarEventId.trim().length > 0;
 
-        html += '<div class="list-item" data-person-id="' + escapeHtml(person.personId) + '">' +
+        var nameHtml = escapeHtml(person.name);
+        if (hasMeeting) {
+          // Link to calendar search for the event title
+          var searchTitle = encodeURIComponent(person.name + ' + Andy Cheetham 1:1');
+          var link = 'https://calendar.google.com/calendar/r/search?q=' + searchTitle;
+          nameHtml = '<a href="' + link + '" target="_blank" title="View in Calendar" style="color: #4285f4; text-decoration: none;">' + escapeHtml(person.name) + '</a>';
+        }
+
+        html += '<div class="list-item compact" data-person-id="' + escapeHtml(person.personId) + '">' +
           '<div class="list-item-info">' +
-          '<div class="list-item-name">' + escapeHtml(person.name) + '</div>' +
-          (hasMeeting ? '<div class="list-item-detail" style="color: #4285f4;">📅 Meeting scheduled</div>' : '') +
+          '<div class="list-item-name">' + nameHtml + '</div>' +
+          (hasMeeting ? '<div class="list-item-detail" style="font-size: 0.75rem; color: #4285f4;">📅 Scheduled</div>' : '') +
           '</div>' +
           '<div class="list-item-actions">' +
           '<button class="button-small button-edit" onclick="handleEditPersonClick(\'' + escapeHtml(person.personId) + '\')">Edit</button>' +
