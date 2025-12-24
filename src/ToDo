@@ -1,0 +1,9 @@
+Default the calendar to Main
+Offer a first week to start from
+On Delete a person make sure it deletes their meeting
+When adding a person look for a spare slot
+When adding a person solve if there are no slots available E.g. completely regenerate or add a new slot
+Multi-Select on Delete a person
+Remove Edit a Person (there is no point)
+More compact Scheduled meeting list
+Speed it up
