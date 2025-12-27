@@ -7,3 +7,4 @@ Multi-Select on Delete a person
 Remove Edit a Person (there is no point)
 More compact Scheduled meeting list
 Speed it up
+Fix the bug in the Scheduled Meeting list "Thursday @ Sat Dec 30 1899 15:00:00 GMT+0000 (Greenwich Mean Time) (30 mins)"
